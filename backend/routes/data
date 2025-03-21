@@ -1,0 +1,9 @@
+admin token : eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY3Y2Q3ZTUwZTkwMzRhNTRjOGJhMjg5YiIsInJvbGUiOiJDdXN0b21lciIsImlhdCI6MTc0MjUyMTI2OSwiZXhwIjoxNzQyNjA3NjY5fQ.yUEhECTqOa2OQtGARcHwSCuX-TOkaqUVa01CE3TsOxU
+cust token : 
+sel token :
+
+{
+    "rating": 5,
+    "comment": "Parfait!",
+    "productId": "67cd7f32e9034a54c8ba28e1"
+}
