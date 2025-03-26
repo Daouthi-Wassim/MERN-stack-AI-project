@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const Seller = require('../models/sellerSchema.js');
 const Admin = require('../models/adminSchema.js');
+const Return = require("../models/returnSchema");
+const Notification = require("../models/notificationSchema");
 const { createNewToken } = require('../utils/token.js');
 
 const sellerRegister = async(req, res) => {
@@ -94,5 +96,139 @@ const sellerLogIn = async(req, res) => {
         });
     }
 };
+const handleReturn = async(req, res) => {
+    try {
+        const { returnId, action } = req.body;
 
-module.exports = { sellerRegister, sellerLogIn };
+        const returnRequest = await Return.findById(returnId)
+            // .populate("customer");
+
+        if (action === "approve") {
+            returnRequest.status = "approved";
+
+            // Notifier le client
+            await Notification.create({
+                // recipient: returnRequest.customer._id,
+                // recipientModel: "Customer",
+                type: "return_update",
+                content: {
+                    title: "Retour approuvé",
+                    message: `Votre retour a été approuvé. Montant: ${returnRequest.requestedAmount || "Full"} TND`
+                }
+            });
+        } else {
+            returnRequest.status = "rejected";
+        }
+
+        await returnRequest.save();
+
+        res.json({ success: true, data: returnRequest });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+};
+
+const getPayments = async(req, res) => {
+    try {
+        const payments = await Payment.find({ seller: req.user.id })
+            .populate("Customer", "name");
+
+        res.json({
+            success: true,
+            data: payments.map(p => ({
+                amount: p.amount + " usd",
+                date: p.createdAt,
+                status: p.status
+            }))
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+const processReturn = async(req, res) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        const { returnId, action } = req.body;
+        const returnRequest = await ReturnRequest.findById(returnId)
+            .populate("order")
+            .session(session);
+
+        // Validation
+        if (!returnRequest || returnRequest.order.seller.toString() !== req.user.id) {
+            await session.abortTransaction();
+            return res.status(403).json({
+                success: false,
+                message: "Action non autorisée"
+            });
+        }
+
+        // Traitement
+        if (action === "approve") {
+            const seller = await Seller.findById(req.user.id).session(session);
+
+            if (seller.balance < returnRequest.requestedAmount) {
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    message: "Solde insuffisant"
+                });
+            }
+
+            seller.balance -= returnRequest.requestedAmount;
+            await seller.save({ session });
+
+            returnRequest.status = "approved";
+            await returnRequest.save({ session });
+
+            // Notification client
+            await NotificationService.create({
+                destinataire: returnRequest.customer,
+                modeleDestinataire: "Customer",
+                type: "RETURN_APPROVED",
+                contenu: {
+                    titre: "Retour approuvé",
+                    message: `Montant remboursé : ${returnRequest.requestedAmount}€`
+                },
+                channel: ["EMAIL", "IN_APP"]
+            }, { session });
+
+        } else {
+            returnRequest.status = "rejected";
+            await returnRequest.save({ session });
+
+            // Notification client
+            await NotificationService.create({
+                destinataire: returnRequest.customer,
+                modeleDestinataire: "Customer",
+                type: "RETURN_REJECTED",
+                contenu: {
+                    titre: "Retour refusé",
+                    message: "Contactez l'admin pour réclamation"
+                },
+                channel: ["EMAIL", "IN_APP"]
+            }, { session });
+        }
+
+        await session.commitTransaction();
+        res.json({ success: true, data: returnRequest });
+
+    } catch (error) {
+        await session.abortTransaction();
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    } finally {
+        session.endSession();
+    }
+};
+module.exports = {
+    sellerRegister,
+    sellerLogIn,
+    handleReturn,
+    getPayments,
+    processReturn
+};

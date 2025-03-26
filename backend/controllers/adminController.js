@@ -3,6 +3,12 @@ const Seller = require('../models/sellerSchema');
 const Customer = require('../models/customerSchema');
 const Product = require('../models/productSchema');
 const Order = require('../models/orderSchema');
+
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const Return = require("../models/returnSchema");
+const Payment = require("../models/paymentSchema");
+const Notification = require("../models/notificationSchema");
+
 const bcrypt = require('bcryptjs');
 
 
@@ -176,7 +182,7 @@ const adminController = {
     },
 
     // Dashboard Statistics
-    // Dans adminController.js
+
     getDashboardStats: async(req, res) => {
         try {
             const [
@@ -186,28 +192,36 @@ const adminController = {
                 totalOrders,
                 revenueResult,
                 recentOrders,
-                topSellers
+                topSellers,
+                paymentStats
             ] = await Promise.all([
                 Customer.countDocuments(),
                 Seller.countDocuments(),
                 Product.countDocuments(),
                 Order.countDocuments(),
-                Order.aggregate([{
-                    $group: {
-                        _id: null,
-                        totalRevenue: { $sum: "$totalPrice" },
-                        averageOrder: { $avg: "$totalPrice" },
-                        totalOrders: { $sum: 1 }
+                Order.aggregate([
+                    { $match: { orderStatus: "Delivered" } },
+                    {
+                        $group: {
+                            _id: null,
+                            totalRevenue: { $sum: "$totalPrice" },
+                            averageOrder: { $avg: "$totalPrice" },
+                            totalOrders: { $sum: 1 }
+                        }
                     }
-                }]),
+                ]),
                 Order.find()
                 .sort({ createdAt: -1 })
                 .limit(5)
                 .populate('buyer', 'name email')
-                .populate('orderedProducts.seller', 'shopName'),
-                Order.aggregate([{
-                        $unwind: "$orderedProducts"
-                    },
+                .populate({
+                    path: 'orderedProducts.seller',
+                    select: 'shopName',
+                    model: 'Seller'
+                })
+                .lean(),
+                Order.aggregate([
+                    { $unwind: "$orderedProducts" },
                     {
                         $group: {
                             _id: "$orderedProducts.seller",
@@ -224,9 +238,7 @@ const adminController = {
                             as: "sellerDetails"
                         }
                     },
-                    {
-                        $unwind: "$sellerDetails"
-                    },
+                    { $unwind: "$sellerDetails" },
                     {
                         $project: {
                             shopName: "$sellerDetails.shopName",
@@ -237,31 +249,63 @@ const adminController = {
                     },
                     { $sort: { totalSales: -1 } },
                     { $limit: 5 }
-                ])
+                ]),
+                Payment.aggregate([{
+                    $group: {
+                        _id: null,
+                        totalRevenue: { $sum: "$breakdown.total" },
+                        totalFees: { $sum: "$breakdown.adminFee" },
+                        totalNet: { $sum: "$netAmount" }
+                    }
+                }])
             ]);
 
+            // Fonction helper pour formater les nombres
+            const safeFormat = (value, defaultValue = 0) => {
+                const num = Number(value);
+                return !isNaN(num) ? num.toFixed(2) : defaultValue.toFixed(2);
+            };
+
             const stats = {
-                customers: totalCustomers,
-                sellers: totalSellers,
+                users: {
+                    customers: totalCustomers,
+                    sellers: totalSellers
+                },
                 products: totalProducts,
-                orders: totalOrders,
-                revenue: revenueResult[0] ? revenueResult[0].totalRevenue : 0,
-                averageOrder: revenueResult[0] ? revenueResult[0].averageOrder : 0,
-                recentOrders: recentOrders.map(order => ({
-                    id: order._id,
-                    status: order.orderStatus,
-                    total: order.totalPrice,
-                    buyer: order.buyer,
-                    date: order.createdAt,
-                    products: order.orderedProducts.length
-                })),
+                orders: {
+                    total: totalOrders,
+                    average: revenueResult[0] && typeof revenueResult[0].averageOrder !== 'undefined' ?
+                        Number(revenueResult[0].averageOrder.toFixed(2)) : 0,
+                    revenue: revenueResult[0] && typeof revenueResult[0].totalRevenue !== 'undefined' ?
+                        Number(revenueResult[0].totalRevenue.toFixed(2)) : 0
+                },
+                payments: {
+                    gross: paymentStats[0] && paymentStats[0].totalRevenue ?
+                        Number(paymentStats[0].totalRevenue.toFixed(2)) : 0,
+                    fees: paymentStats[0] && paymentStats[0].totalFees ?
+                        Number(paymentStats[0].totalFees.toFixed(2)) : 0,
+                    net: paymentStats[0] && paymentStats[0].totalNet ?
+                        Number(paymentStats[0].totalNet.toFixed(2)) : 0
+                },
+
+                recentOrders: await Order.find()
+                    .sort({ createdAt: -1 })
+                    .limit(5)
+                    .populate('buyer', 'name email')
+                    .populate({
+                        path: 'orderedProducts.seller',
+                        select: 'shopName',
+                        model: 'Seller'
+                    })
+                    .lean(),
                 topSellers: topSellers.map(seller => ({
                     shopName: seller.shopName,
-                    totalSales: seller.totalSales,
-                    orders: seller.totalOrders,
-                    productsSold: seller.productsSold
+                    sales: safeFormat(seller.totalSales),
+                    orders: seller.totalOrders || 0,
+                    products: seller.productsSold || 0
                 }))
             };
+
             res.json({
                 success: true,
                 data: stats
@@ -271,11 +315,12 @@ const adminController = {
             console.error('Dashboard error:', error);
             res.status(500).json({
                 success: false,
-                message: 'Error fetching dashboard data',
-                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+                message: 'Erreur de récupération des données',
+                error: process.env.NODE_ENV === 'development' ? error.message : null
             });
         }
     },
+
 
     // User Management
     getAllUsers: async(req, res) => {
@@ -437,7 +482,65 @@ const adminController = {
             console.error('Get orders error:', error);
             res.status(500).json({ message: 'Error fetching orders' });
         }
-    }
-};
+    },
+    //return
+    getUrgentReturns: async(req, res) => {
+        try {
+            const urgentReturns = await Return.find({ status: "requested" })
+                .populate("customer", "name email")
+                .populate("order");
 
+            // Créer notification urgente
+            await Notification.create({
+                recipient: req.user.id,
+                recipientModel: "Admin",
+                type: "urgent_return",
+                content: {
+                    title: `${urgentReturns.length} retours urgents`,
+                    message: "Action requise immédiatement"
+                }
+            });
+
+            res.json({ success: true, data: urgentReturns });
+        } catch (error) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    },
+    ////
+    processRefund: async(req, res) => {
+        try {
+            const { paymentId, amount } = req.body;
+
+            const payment = await Payment.findById(paymentId);
+
+            // Convertir en centimes pour Stripe
+            const refundAmount = Math.round(amount * 100);
+
+            const refund = await stripe.refunds.create({
+                payment_intent: payment.stripePaymentId,
+                amount: refundAmount
+            });
+
+            // Mettre à jour le paiement
+            payment.refunds.push({
+                amount: amount,
+                reason: "Refund processed by admin",
+                created: new Date()
+            });
+
+            await payment.save();
+
+            res.json({
+                success: true,
+                data: {
+                    id: refund.id,
+                    amount: refund.amount / 100 + " TND"
+                }
+            });
+        } catch (error) {
+            res.status(400).json({ success: false, error: error.message });
+        }
+    }
+
+};
 module.exports = adminController;

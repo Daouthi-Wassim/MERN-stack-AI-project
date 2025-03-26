@@ -1,10 +1,25 @@
 const router = require('express').Router();
 const {
     isAdmin,
+    isCustomer,
     authMiddleware,
-    isSeller
+    isSeller,
+    //validateAdminFee
 } = require('../middleware/authMiddleware.js');
 
+/* //////////// payment/////////////////////////
+const {
+    createPayment,
+    getAllPayments
+} = require("../controllers/paymentController");
+
+router.post("/payments/create",
+    authMiddleware,
+    validateAdminFee,
+    createPayment
+);
+
+*/ ////////////////////
 
 const {
     createReview,
@@ -15,7 +30,7 @@ const {
 } = require('../controllers/reviewController');
 
 const {
-    adminLogin,
+
     getDashboardStats,
     getAllUsers,
     deleteUser,
@@ -27,7 +42,9 @@ const {
 
 const {
     sellerRegister,
-    sellerLogIn
+    sellerLogIn,
+    handleReturn,
+    getPayments
 } = require('../controllers/sellerController.js');
 
 const {
@@ -52,7 +69,11 @@ const {
     customerRegister,
     customerLogIn,
     getCartDetail,
-    cartUpdate
+    cartUpdate,
+    requestReturn,
+    createPayment,
+    createReturn,
+    processReturn
 } = require('../controllers/customerController.js');
 
 const {
@@ -63,9 +84,43 @@ const {
     getOrderedProductsBySeller
 } = require('../controllers/orderController.js');
 
+// Client
+//router.post("/create", createPayment);
+
+// Admin
+//router.get("/", authMiddleware, isAdmin, getAllPayments);
+
+/////return////////////
+const {
+
+    //updateReturnRequest
+} = require("../controllers/returnController");
+
+router.post("/customer/payments", authMiddleware, isCustomer, createPayment);
+router.post("/returns", authMiddleware, isCustomer, requestReturn);
+router.post("/createreturns", authMiddleware, isCustomer, createReturn);
+
+router.post("/procereturns", authMiddleware, processReturn);
+
+// Client
+
+
+// Admin
+//router.put("/updatereturn/:id", authMiddleware, updateReturnRequest);
+
+///////////////////////////////////
+
+
+
+
+
+
+///////reviews ////////////////////////
 
 // Seller routes
 router.get('/sellerReviews', authMiddleware, isSeller, getSellerStats);
+router.put("/returns/:id", authMiddleware, isSeller, handleReturn);
+router.get("/seller/payments", authMiddleware, isSeller, getPayments);
 
 // Admin routes
 router.get('/allrev/admin-stats', authMiddleware, isAdmin, getAdminStats);
@@ -74,14 +129,16 @@ router.put('/updaterev/:id', authMiddleware, isAdmin, updateReview);
 
 router.delete('/deleterev/:id', authMiddleware, isAdmin, deleteReview);
 router.post('/createReview', authMiddleware, createReview);
-/*reviews
 
+/*
 router.get('/getuserrev', authMiddleware, getUserReviews);
 router.get('/getev/:subjectType/:subjectId', getReviews);
 */
+
+/////////////////////////////////////////////////
+
 // Admin Routes
-router.post('/AdminLogin', authMiddleware, adminLogin);
-router.post('/admin/create', authMiddleware, createAdmin);
+router.post('/admin/create', authMiddleware, isAdmin, createAdmin);
 router.get('/admin/dashboard-stats', authMiddleware, getDashboardStats);
 router.get('/admin/users', authMiddleware, getAllUsers);
 router.delete('/admin/users/:role/:id', authMiddleware, deleteUser);
@@ -121,9 +178,9 @@ router.get('/getCartDetail/:id', getCartDetail);
 router.put('/CustomerUpdate/:id', cartUpdate);
 
 // Order
-router.post('/newOrder', newOrder);
-router.get('/getOrderedProductsByCustomer/:id', getOrderedProductsByCustomer);
-router.get('/getOrderedProductsBySeller/:id', getOrderedProductsBySeller);
+router.post('/newOrder', authMiddleware, newOrder);
+router.get('/getOrderedProductsByCustomer/:id', authMiddleware, isAdmin, getOrderedProductsByCustomer);
+router.get('/getOrderedProductsBySeller/:id', authMiddleware, getOrderedProductsBySeller);
 
 
 module.exports = router;

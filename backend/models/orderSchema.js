@@ -16,28 +16,31 @@ const orderSchema = new mongoose.Schema({
             type: Number,
             required: true,
             min: 1
+        },
+        seller: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Seller",
+            required: true
         }
     }],
     totalPrice: {
         type: Number,
         required: true,
-        min: 0
+        min: 10
     },
+    paymentStatus: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Payment"
+    },
+    transactions: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Payment"
+    }],
     orderStatus: {
         type: String,
         enum: ["Processing", "Shipped", "Delivered", "Cancelled"],
         default: "Processing"
-    },
-    paymentStatus: {
-        type: String,
-        enum: ["Pending", "Completed", "Failed", "Refunded"],
-        required: true
-    },
-    deliveredAt: Date,
-    createdAt: {
-        type: Date,
-        default: Date.now,
-    },
-});
+    }
+}, { timestamps: true });
 
-module.exports = mongoose.model("order", orderSchema);
+module.exports = mongoose.model("Order", orderSchema);

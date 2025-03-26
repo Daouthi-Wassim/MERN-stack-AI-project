@@ -9,14 +9,14 @@ const createNewToken = (user) => {
 
         // Create a clean payload object
         const payload = {
-            id: user._id ? {}.toString() : user.id, // Fixed syntax error in optional chaining
+            id: user._id ? user._id.toString() : "errreur", // Fixed syntax error in optional chaining
             email: user.email,
             role: user.role
         };
 
         // Generate token with explicit options
         const token = jwt.sign(payload, process.env.JWT_SECRET, {
-            expiresIn: '24h',
+            expiresIn: '7d',
             algorithm: 'HS256'
         });
 

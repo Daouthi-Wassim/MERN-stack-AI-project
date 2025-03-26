@@ -46,8 +46,39 @@ const isAdmin = (req, res, next) => {
     if (req.user.role === 'Admin') return next();
     res.status(403).json({ success: false, message: "Accès admin requis" });
 };
+// backend/middleware/feeValidation.js
+const validateAdminFee = (req, res, next) => {
+    const { breakdown } = req.body;
+
+    if (!breakdown) return next();
+
+    const expectedFee = (breakdown.subtotal + breakdown.tax) * 0.10;
+    const feeDifference = Math.abs(breakdown.adminFee - expectedFee);
+
+    if (feeDifference > 0.01) {
+        return res.status(400).json({
+            error: `Calcul des frais invalide. Différence détectée: ${feeDifference.toFixed(2)}TND`
+        });
+    }
+
+    next();
+};
+const isCustomer = (req, res, next) => {
+    if (req.user.role !== "Customer") {
+        return res.status(403).json({
+            success: false,
+            error: "Accès client requis"
+        });
+    }
+    next();
+};
+
+
+
 module.exports = {
     authMiddleware,
     isAdmin,
-    isSeller
+    isSeller,
+    isCustomer,
+    validateAdminFee
 };

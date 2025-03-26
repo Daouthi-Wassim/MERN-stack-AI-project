@@ -14,12 +14,12 @@ const reviewSchema = new mongoose.Schema({
     },
     subject: {
         type: mongoose.Schema.Types.ObjectId,
-        //required: true,
+        required: true,
         refPath: 'subjectType'
     },
     subjectType: {
         type: String,
-        //required: true,
+        required: true,
         enum: ['Product']
     },
     reviewer: {

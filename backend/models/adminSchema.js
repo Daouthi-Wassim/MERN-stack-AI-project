@@ -19,6 +19,11 @@ const adminSchema = new mongoose.Schema({
         required: true,
         minlength: 4
     },
+    platformBalance: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
     role: {
         type: String,
         default: 'Admin',
