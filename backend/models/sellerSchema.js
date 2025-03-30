@@ -9,7 +9,8 @@ const sellerSchema = new mongoose.Schema({
     email: {
         type: String,
         unique: true,
-        required: true
+        required: true,
+        match: /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/
     },
     password: {
         type: String,
@@ -31,7 +32,7 @@ const sellerSchema = new mongoose.Schema({
     },
     stripeAccountId: {
         type: String,
-        required: true
+        /// required: true
     }
 }, { timestamps: true });
 

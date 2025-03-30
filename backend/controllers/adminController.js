@@ -1,11 +1,11 @@
+const mongoose = require("mongoose");
 const Admin = require('../models/adminSchema');
 const Seller = require('../models/sellerSchema');
 const Customer = require('../models/customerSchema');
 const Product = require('../models/productSchema');
 const Order = require('../models/orderSchema');
-
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
-const Return = require("../models/returnSchema");
+const Review = require('../models/reviewSchema');
+const ReturnRequest = require("../models/returnSchema");
 const Payment = require("../models/paymentSchema");
 const Notification = require("../models/notificationSchema");
 
@@ -323,41 +323,55 @@ const adminController = {
 
 
     // User Management
-    getAllUsers: async(req, res) => {
+    getcustomers: async(req, res) => {
         try {
-            const { role, sort, page = 1, limit = 10 } = req.query;
+            const { sort, page = 1, limit = 10 } = req.query;
             let users = [],
                 total = 0;
 
-            if (role === 'Seller') {
-                users = await Seller.find()
-                    .select('-password')
-                    .sort(sort ? {
-                        [sort]: 1
-                    } : { createdAt: -1 })
-                    .skip((page - 1) * limit)
-                    .limit(parseInt(limit));
-                total = await Seller.countDocuments();
-            } else if (role === 'Customer') {
-                users = await Customer.find()
-                    .select('-password')
-                    .sort(sort ? {
-                        [sort]: 1
-                    } : { createdAt: -1 })
-                    .skip((page - 1) * limit)
-                    .limit(parseInt(limit));
-                total = await Customer.countDocuments();
-            } else {
-                // Get both sellers and customers
-                const [sellers, customers] = await Promise.all([
-                    Seller.find().select('-password'),
-                    Customer.find().select('-password')
-                ]);
-                users = [...sellers, ...customers]
-                    .sort((a, b) => b.createdAt - a.createdAt)
-                    .slice((page - 1) * limit, page * limit);
-                total = sellers.length + customers.length;
-            }
+
+            users = await Customer.find()
+                .select('-password')
+                .sort(sort ? {
+                    [sort]: 1
+                } : { createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(parseInt(limit));
+            total = await Customer.countDocuments();
+
+
+
+            res.json({
+                success: true,
+                data: {
+                    users,
+                    total,
+                    pages: Math.ceil(total / limit),
+                    currentPage: parseInt(page)
+                }
+            });
+        } catch (error) {
+            console.error('Get users error:', error);
+            res.status(500).json({ message: 'Error fetching users' });
+        }
+    },
+    getsellers: async(req, res) => {
+        try {
+            const { sort, page = 1, limit = 10 } = req.query;
+            let users = [],
+                total = 0;
+
+
+            users = await Seller.find()
+                .select('-password')
+                .sort(sort ? {
+                    [sort]: 1
+                } : { createdAt: -1 })
+                .skip((page - 1) * limit)
+                .limit(parseInt(limit));
+            total = await Seller.countDocuments();
+
+
 
             res.json({
                 success: true,
@@ -483,64 +497,242 @@ const adminController = {
             res.status(500).json({ message: 'Error fetching orders' });
         }
     },
-    //return
-    getUrgentReturns: async(req, res) => {
-        try {
-            const urgentReturns = await Return.find({ status: "requested" })
-                .populate("customer", "name email")
-                .populate("order");
 
-            // Créer notification urgente
-            await Notification.create({
-                recipient: req.user.id,
-                recipientModel: "Admin",
-                type: "urgent_return",
-                content: {
-                    title: `${urgentReturns.length} retours urgents`,
-                    message: "Action requise immédiatement"
+
+    getReviewSellers: async(req, res) => {
+        try {
+            const sellerStats = await Review.aggregate([{
+                    $group: {
+                        _id: "$seller",
+                        averageRating: { $avg: "$rating" },
+                        totalReviews: { $sum: 1 }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "sellers",
+                        localField: "_id",
+                        foreignField: "_id",
+                        as: "seller"
+                    }
+                },
+                {
+                    $project: {
+                        sellerId: "$_id",
+                        sellerName: { $arrayElemAt: ["$seller.shopName", 0] },
+                        averageRating: { $round: ["$averageRating", 1] },
+                        totalReviews: 1,
+                        _id: 0
+                    }
                 }
-            });
-
-            res.json({ success: true, data: urgentReturns });
-        } catch (error) {
-            res.status(500).json({ success: false, error: error.message });
-        }
-    },
-    ////
-    processRefund: async(req, res) => {
-        try {
-            const { paymentId, amount } = req.body;
-
-            const payment = await Payment.findById(paymentId);
-
-            // Convertir en centimes pour Stripe
-            const refundAmount = Math.round(amount * 100);
-
-            const refund = await stripe.refunds.create({
-                payment_intent: payment.stripePaymentId,
-                amount: refundAmount
-            });
-
-            // Mettre à jour le paiement
-            payment.refunds.push({
-                amount: amount,
-                reason: "Refund processed by admin",
-                created: new Date()
-            });
-
-            await payment.save();
+            ]);
 
             res.json({
                 success: true,
-                data: {
-                    id: refund.id,
-                    amount: refund.amount / 100 + " TND"
+                data: sellerStats
+            });
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message // Correction de 'messsage' à 'message'
+            });
+        }
+    },
+
+    getReviewProducts: async(req, res) => {
+        try {
+            const productStats = await Review.aggregate([{
+                    $group: {
+                        _id: "$product",
+                        averageRating: { $avg: "$rating" },
+                        totalReviews: { $sum: 1 }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "products",
+                        localField: "_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                },
+                {
+                    $project: {
+                        productId: "$_id",
+                        productName: { $arrayElemAt: ["$product.productName", 0] },
+                        averageRating: { $round: ["$averageRating", 1] },
+                        totalReviews: 1,
+                        _id: 0
+                    }
                 }
+            ]);
+
+            res.json({
+                success: true,
+                data: productStats
+            });
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message // Correction de 'messsage' à 'message'
+            });
+        }
+    },
+    addSeller: async(req, res) => {
+        try {
+            const { name, email, password, shopName } = req.body;
+            const hashedPassword = await bcrypt.hash(password, 12);
+
+            const newSeller = await Seller.create({
+                name,
+                email,
+                password: hashedPassword,
+                shopName
+            });
+
+            newSeller.password = undefined;
+            res.status(201).json({
+                success: true,
+                data: newSeller
             });
         } catch (error) {
-            res.status(400).json({ success: false, error: error.message });
+            res.status(400).json({
+                success: false,
+                message: error.message
+            });
         }
-    }
+    },
+    addcustomer: async(req, res) => {
+        try {
+            const { name, email, password } = req.body;
+            const hashedPassword = await bcrypt.hash(password, 12);
 
-};
+            const newCustomer = await Customer.create({
+                name,
+                email,
+                password: hashedPassword,
+
+            });
+
+            newCustomer.password = undefined;
+            res.status(201).json({
+                success: true,
+                data: newCustomer
+            });
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    getCustomerDetails: async(req, res) => {
+        try {
+            const customer = await Customer.findById(req.params.id)
+                .select('-password')
+                .populate({
+                    path: 'cartDetails.Seller',
+                    select: 'shopName'
+                })
+                .populate({
+                    path: 'orders',
+                    select: 'totalPrice orderStatus createdAt'
+                });
+
+            if (!customer) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Acheteur non trouvé"
+                });
+            }
+
+            res.json({ success: true, data: customer });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    getPaymentDetails: async(req, res) => {
+        try {
+            let query = {};
+
+            if (req.query.status) {
+                query.status = req.query.status;
+            }
+            const payments = await Payment.find(query)
+                .populate("seller")
+                .populate("customer", "email");
+
+            if (payments.length === 0) {
+                return res.status(404).json({ success: false, message: "Payment status no found " });
+            }
+            res.json({
+                success: true,
+                data: payments.map(p => ({
+                    amount: p.amount,
+                    currency: p.currency,
+                    status: p.status,
+                    date: p.createdAt,
+                }))
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+
+
+    getallReturnRequests: async(req, res) => {
+        try {
+
+            let pipeline = [];
+            const returns = await ReturnRequest.aggregate(pipeline)
+                .sort("-createdAt")
+                .limit(50);
+
+            res.json({
+                success: true,
+                data: returns
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+
+    getAdminNotifications: async(req, res) => {
+        try {
+            const notifications = await Notification.find({
+
+                    modeleDestinataire: 'Admin',
+                })
+                .sort("-createdAt")
+                .limit(100);
+
+            res.json({
+                success: true,
+                data: notifications
+            });
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+
+}
 module.exports = adminController;

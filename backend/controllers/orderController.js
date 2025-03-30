@@ -1,5 +1,13 @@
-const Order = require('../models/orderSchema.js');
-
+const mongoose = require("mongoose");
+const Product = require('../models/productSchema.js')
+const Order = require('../models/orderSchema');
+const Customer = require('../models/customerSchema.js');
+const Admin = require('../models/adminSchema.js');
+const Seller = require('../models/sellerSchema');
+const NotificationService = require('../routes/notificationService.js');
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const Payment = require("../models/paymentSchema");
+const ReturnRequest = require("../models/returnSchema");
 const newOrder = async(req, res) => {
     try {
         const {
@@ -140,118 +148,116 @@ const getOrderedProductsBySeller = async(req, res) => {
     }
 };
 const updateOrderStatus = async(req, res) => {
+    const session = await mongoose.startSession();
     try {
+        session.startTransaction();
         const { status } = req.body;
         const validStatuses = ["Processing", "Shipped", "Delivered", "Cancelled"];
-        const STATUS_LABELS = {
-            Processing: "en traitement",
-            Shipped: "expédiée",
-            Delivered: "livrée",
-            Cancelled: "annulée"
-        };
 
-        // Validation du statut
+        // Validation
         if (!validStatuses.includes(status)) {
+            await session.abortTransaction();
             return res.status(400).json({
                 success: false,
-                message: `Statut invalide. Options valides : ${validStatuses.join(", ")}`
+                message: `Invalid status. Valid options: ${validStatuses.join(", ")}`
             });
         }
 
-        // Récupération et mise à jour avec population corrigée
-        const order = await Order.findByIdAndUpdate(
-            req.params.id, { orderStatus: status }, {
-                new: true,
-                runValidators: true,
-                populate: [
-                    { path: 'buyer', select: 'name email phone' },
-                    {
-                        path: 'orderedProducts.product',
-                        select: 'productName price',
-                        populate: {
-                            path: 'seller',
-                            select: 'shopName email'
-                        }
-                    }
-                ]
+        const order = await Order.findById(req.params.id)
+            .session(session)
+            .populate('Customer')
+            .populate('paymentStatus');
+
+        // Cancellation handling
+        if (status === "Cancelled") {
+            if (order.orderStatus === "Delivered") {
+                await session.abortTransaction();
+                return res.status(400).json({
+                    success: false,
+                    message: "Cannot cancel a delivered order"
+                });
             }
-        ).lean();
 
-        if (!order) {
-            return res.status(404).json({
-                success: false,
-                message: "Commande introuvable"
+            // Update order status
+            order.orderStatus = "Cancelled";
+            await order.save({ session });
+
+            // Process refund
+            await Payment.findByIdAndUpdate(
+                order.paymentStatus._id, {
+                    status: 'refunded',
+                    refundDate: new Date(),
+                    refundReason: "Customer cancellation"
+                }, { session }
+            );
+
+            // Customer notification
+            await NotificationService.create({
+                destinataire: order.buyer._id,
+                modeleDestinataire: 'Customer',
+                type: 'ORDER_CANCELLED',
+                content: {
+                    title: `Order #${order._id.toString().slice(-6)} cancelled`,
+                    message: "Your refund will be processed within 5-7 business days",
+                    metadata: { orderId: order._id }
+                },
+                channels: ['EMAIL', 'IN_APP']
             });
-        }
 
-        // Notification client
-        await NotificationService.create({
-            destinataire: order.buyer._id,
-            modeleDestinataire: 'Customer',
-            type: 'STATUT_COMMANDE',
-            contenu: {
-                titre: `Commande #${order._id.toString().slice(-6)}`,
-                message: `Votre commande est maintenant ${STATUS_LABELS[status]}`,
-                metadata: { idCommande: order._id }
-            },
-            channel: ['EMAIL', 'IN_APP']
-        });
-
-        // Notification vendeur(s)
-        if (['Shipped', 'Delivered'].includes(status)) {
-            const uniqueSellers = [...new Set(
-                order.orderedProducts.map(p => p.product.seller._id.toString())
-            )];
-
-            for (const sellerId of uniqueSellers) {
+            // Seller notifications (informational)
+            const sellers = [...new Set(order.orderedProducts.map(p => p.seller))];
+            await Promise.all(sellers.map(async(sellerId) => {
                 await NotificationService.create({
                     destinataire: sellerId,
                     modeleDestinataire: 'Seller',
-                    type: 'STATUT_COMMANDE',
-                    contenu: {
-                        titre: `Mise à jour commande #${order._id.toString().slice(-6)}`,
-                        message: `Statut changé à : ${STATUS_LABELS[status]}`,
-                        metadata: { idCommande: order._id }
-                    }
+                    type: 'ORDER_CANCELLED',
+                    content: {
+                        title: `Order #${order._id.toString().slice(-6)} cancelled`,
+                        message: "Customer initiated cancellation - refund processed",
+                        metadata: { orderId: order._id }
+                    },
+                    channels: ['IN_APP']
                 });
-            }
-        }
+            }));
 
-        // Notification admin pour annulation
-        if (status === 'Cancelled') {
-            await NotificationService.create({
-                destinataire: process.env.ADMIN_ID,
-                modeleDestinataire: 'Admin',
-                type: 'ALERTE_SYSTEME',
-                contenu: {
-                    titre: 'Annulation de commande',
-                    message: `Commande #${order._id.toString().slice(-6)} annulée par ${order.buyer.name}`
-                },
-                channel: ['EMAIL']
+            await session.commitTransaction();
+            return res.json({
+                success: true,
+                message: "Cancellation confirmed. Refund initiated successfully",
+                data: {
+                    orderId: order._id,
+                    refundEta: "5-7 business days"
+                }
             });
         }
 
+        // Regular status update
+        order.orderStatus = status;
+        await order.save({ session });
+        await session.commitTransaction();
+
         res.json({
             success: true,
-            data: order,
-            notification: "Statut mis à jour et notifications envoyées"
+            message: "Order status updated successfully",
+            data: order
         });
 
     } catch (error) {
-        console.error("Erreur mise à jour statut:", error);
-
-        // Gestion des erreurs de monitoring
-        if (process.env.NODE_ENV === 'production' && typeof captureError === 'function') {
-            captureError(error);
-        }
-
+        await session.abortTransaction();
+        console.error("Server Error:", error);
         res.status(500).json({
             success: false,
             message: process.env.NODE_ENV === 'development' ?
-                `Erreur serveur : ${error.message}` : "Une erreur est survenue lors de la mise à jour"
+                `Server Error: ${error.message}` : "Internal server error"
         });
+    } finally {
+        session.endSession();
     }
 };
+
+
+
+
 const getOrderDetails = async(req, res) => {
     try {
         const order = await Order.findById(req.params.id)

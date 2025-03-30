@@ -10,8 +10,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/paymentSchema");
 const ReturnRequest = require("../models/returnSchema");
 const { createNewToken } = require('../utils/token.js');
-const { default: next } = require("next");
-const { isCustomer } = require("../middleware/authMiddleware.js");
+
 
 const customerRegister = async(req, res) => {
     try {
@@ -574,9 +573,52 @@ const processReturn = async(req, res) => {
     }
 };
 
+const getcustomerNotification = async(req, res) => {
+    try {
+        const notifications = await Notification.find({
+
+                modeleDestinataire: 'Customer',
+            })
+            .sort("-createdAt")
+            .limit(100);
+
+        res.json({
+            success: true,
+            data: notifications
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+const getcustomerReturnRequests = async(req, res) => {
+    try {
+
+        const { customerId } = req.query;
+        let pipeline = [];
+        pipeline.push({
+            $match: { customer: new mongoose.Types.ObjectId(customerId) }
+        });
 
 
+        const returns = await ReturnRequest.aggregate(pipeline)
+            .sort("-createdAt")
+            .limit(50);
 
+        res.json({
+            success: true,
+            data: returns
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 module.exports = {
     customerRegister,
     customerLogIn,
@@ -585,5 +627,7 @@ module.exports = {
     requestReturn,
     createPayment,
     createReturn,
-    processReturn
+    processReturn,
+    getcustomerNotification,
+    getcustomerReturnRequests
 };

@@ -34,28 +34,17 @@ const productSchema = new mongoose.Schema({
         type: Number,
         default: 1
     },
-    reviews: [{
-        rating: {
-            type: Number,
-        },
-        comment: {
-            type: String,
-        },
-        reviewer: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "customer",
-        },
-        date: {
-            type: Date,
-            default: Date.now,
-        },
-    }, ],
+    reviews: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Review',
+        required: true
+    },
     seller: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'seller',
+        ref: 'Seller',
         required: true
     },
     isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
-module.exports = mongoose.model("product", productSchema)
+module.exports = mongoose.model("Product", productSchema)
