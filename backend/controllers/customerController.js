@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require('bcrypt');
+const Review = require('../models/reviewSchema');
 const Product = require('../models/productSchema.js')
 const Order = require('../models/orderSchema');
 const Customer = require('../models/customerSchema.js');
@@ -619,6 +620,137 @@ const getcustomerReturnRequests = async(req, res) => {
         });
     }
 };
+const createReview = async(req, res) => {
+    const session = await mongoose.startSession();
+
+    try {
+        await session.startTransaction();
+
+
+        const { orderId, productId, rating, comment } = req.body;
+
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            await session.abortTransaction();
+            return res.status(400).json({
+                success: false,
+                message: "ID invalid"
+            });
+        }
+
+        const order = await Order.findById(orderId)
+            .populate({
+                path: 'buyer',
+                select: '_id name',
+                options: { lean: true }
+            })
+            .populate({
+                path: 'orderedProducts.product',
+                select: 'productName seller',
+                model: Product
+            })
+            .session(session);
+
+
+        if (!order || order.orderStatus !== "Delivered") {
+            await session.abortTransaction();
+            return res.status(403).json({
+                success: false,
+                message: "  This order not delivered "
+            });
+        }
+
+        // 4. Vérification du produit dans la commande
+        const orderedProduct = order.orderedProducts.find(p =>
+            p.product._id.toString() === productId
+        );
+
+        if (!orderedProduct) {
+            await session.abortTransaction();
+            return res.status(404).json({
+                success: false,
+                message: "This Product not exist"
+            });
+        }
+
+        // 5. Vérification d'avis existant
+        const existingReview = await Review.findOne({
+            orderReference: orderId,
+            product: productId,
+            reviewer: req.user._id
+        }).session(session);
+
+        if (existingReview) {
+            await session.abortTransaction();
+            return res.status(409).json({
+                success: false,
+                message: "This order already reviewed"
+            });
+        }
+
+        // 6. Création de l'avis
+        const newReview = await Review.create([{
+            rating,
+            comment,
+            product: productId,
+            seller: orderedProduct.product.seller,
+            reviewer: order.buyer._id,
+            orderReference: orderId,
+            verifiedPurchase: true,
+            subject: productId,
+            subjectType: 'Product'
+        }], { session });
+
+        // 7. Mise à jour des statistiques du produit
+        const updatedProduct = await Product.findByIdAndUpdate(
+            productId, {
+                $push: { reviews: newReview[0]._id },
+                $inc: { totalRatings: rating, ratingCount: 1 }
+            }, { new: true, session }
+        );
+
+        // 8. Notification au vendeur
+        await NotificationService.create({
+            destinataire: orderedProduct.product.seller,
+            modeleDestinataire: 'Seller',
+            type: 'NEW_REVIEW',
+            contenu: {
+                titre: "New review",
+                message: `${order.buyer.name} reviewed the  "${orderedProduct.product.productName}"`,
+                metadata: {
+                    customerName: order.buyer.name,
+                    productName: orderedProduct.product.productName,
+                    rating: rating,
+                    comment: comment,
+                    productId: productId,
+                    orderId: orderId,
+                    reviewId: newReview[0]._id
+                }
+            },
+            channel: ['IN_APP', 'EMAIL']
+        }, { session });
+
+        await session.commitTransaction();
+
+        res.status(201).json({
+            success: true,
+            data: {
+                review: newReview[0],
+                averageRating: updatedProduct.totalRatings / updatedProduct.ratingCount
+            }
+        });
+
+    } catch (error) {
+        await session.abortTransaction();
+        console.error('Review Error:', error);
+        res.status(500).json({
+            success: false,
+            message: process.env.NODE_ENV === 'development' ?
+                error.message : "Erreur lors de la création de l'avis"
+        });
+    } finally {
+        await session.endSession();
+    }
+};
 module.exports = {
     customerRegister,
     customerLogIn,
@@ -629,5 +761,6 @@ module.exports = {
     createReturn,
     processReturn,
     getcustomerNotification,
-    getcustomerReturnRequests
+    getcustomerReturnRequests,
+    createReview
 };

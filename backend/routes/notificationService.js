@@ -1,4 +1,3 @@
-// services/notificationService.js
 const mongoose = require('mongoose');
 const Notification = require('../models/notificationSchema');
 const Seller = require('../models/sellerSchema');
@@ -116,7 +115,9 @@ class NotificationService {
     static generateEmailTemplate(notification) {
             const { metadata } = notification.contenu;
             switch (notification.type) {
-                case "PAIEMENT_REUSSI" || "CREDIT_SOLDE " || "COMMISSION":
+                case 'PAIEMENT_REUSSI':
+                case 'CREDIT_SOLDE ':
+                case 'COMMISSION':
                     return `
            <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
     <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
@@ -186,10 +187,19 @@ class NotificationService {
         `;
         case "RETURN_REQUEST":
             return `
-                <div style="font-family: Arial; max-width: 600px; margin: auto; border: 1px solid #ddd;">
-                    <h2 style="background: #6a1b9a; color: white; padding: 15px;">
-                        Nouvelle demande de retour
-                    </h2>
+                   <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
+                    <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                        <img src='' alt="Shoppingi Logo" style="max-width: 200px; height: auto;">
+                            <h1 style="color: white; margin: 0; font-family: 'Arial Rounded MT Bold', sans-serif; letter-spacing: 2px;">
+                                SHOPPINGI
+                            </h1>
+                        </div>
+                    </header>
+                    <h2 style="margin-bottom: 25px; border-left: 4px solidrgb(248, 246, 249); padding-left: 15px;">
+            ${notification.contenu.titre}
+        </h2>
+       
                     <div style="padding: 20px;">
                         <p><strong>Type:</strong> ${notification.contenu.message.split('|')[0]}</p>
                         <p><strong>Montant:</strong> ${metadata.amount}</p>
@@ -198,25 +208,62 @@ class NotificationService {
                             Traiter la demande
                         </a>
                     </div>
+                                <footer style="background: rgb(82, 5, 106); padding: 20px; text-align: center; color: #d0d0d0; font-size: 0.9em;">
+                    
+                        <p style="margin: 5px 0;">
+                            © ${new Date().getFullYear()} Shoppingi 
+                            <span style="color: #6a1b9a;">•</span> 
+                            Tous droits réservés
+                        </p>
+                    </footer>
                 </div>
-            `;
+                    `;
         
         case "RETURN_APPROVED":
             return `
-                <div style="...">
-                    <h2>Votre retour a été accepté</h2>
+                <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
+                <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <img src='' alt="Shoppingi Logo" style="max-width: 200px; height: auto;">
+                        <h1 style="color: white; margin: 0; font-family: 'Arial Rounded MT Bold', sans-serif; letter-spacing: 2px;">
+                            SHOPPINGI
+                        </h1>
+                    </div>
+                </header>
+                     <h2 style="margin-bottom: 25px; border-left: 4px solidrgb(248, 246, 249); padding-left: 15px;">
+            ${notification.contenu.titre}
+        </h2>
                     ${metadata.type === "exchange" ? `
                         <p>Préparez-vous à recevoir votre nouvel article</p>
                     ` : `
                         <p>Montant remboursé: ${metadata.amount}€</p>
                         <p>Date: ${new Date(metadata.date).toLocaleDateString()}</p>
                     `}
-                </div>
+                    <footer style="background: rgb(82, 5, 106); padding: 20px; text-align: center; color: #d0d0d0; font-size: 0.9em;">
+      
+                    <p style="margin: 5px 0;">
+                        © ${new Date().getFullYear()} Shoppingi 
+                        <span style="color: #6a1b9a;">•</span> 
+                        Tous droits réservés
+                    </p>
+                </footer>
+            </div>
             `;
             
         case "RETURN_REJECTED":
             return `
-                <div style="...">
+                    <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
+                    <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                        <img src='' alt="Shoppingi Logo" style="max-width: 200px; height: auto;">
+                            <h1 style="color: white; margin: 0; font-family: 'Arial Rounded MT Bold', sans-serif; letter-spacing: 2px;">
+                                SHOPPINGI
+                            </h1>
+                        </div>
+                    </header>
+                        <h2 style="margin-bottom: 25px; border-left: 4px solidrgb(248, 246, 249); padding-left: 15px;">
+                ${notification.contenu.titre}
+            </h2>
                     <h2>Demande de retour refusée</h2>
                     <p>Raison: ${metadata.reason || "Non spécifiée"}</p>
                     <a href="${process.env.SUPPORT_URL}">Contacter le support</a>
@@ -228,9 +275,18 @@ class NotificationService {
                     <h2>Demande de retour refusée</h2>
                     <p>Raison: ${metadata.reason || "Non spécifiée"}</p>
                     <a href="${process.env.SUPPORT_URL}">Contacter le support</a>
-                </div>
+                 <footer style="background: rgb(82, 5, 106); padding: 20px; text-align: center; color: #d0d0d0; font-size: 0.9em;">
+      
+                    <p style="margin: 5px 0;">
+                        © ${new Date().getFullYear()} Shoppingi 
+                        <span style="color: #6a1b9a;">•</span> 
+                        Tous droits réservés
+                    </p>
+                </footer>
+            </div>
             `;
-            case "ORDER_CANCELLED"||"ORDER_DELIVERED":
+            case "ORDER_CANCELLED":
+            case"ORDER_DELIVERED":
                 return `
 <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
     <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
@@ -295,7 +351,66 @@ class NotificationService {
     </footer>
 </div>
 `;
+case 'NEW_REVIEW':
+    return `
+<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
+    <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <img src='' alt="Shoppingi Logo" style="max-width: 200px; height: auto;">
+            <h1 style="color: white; margin: 0; font-family: 'Arial Rounded MT Bold', sans-serif; letter-spacing: 2px;">
+                SHOPPINGI
+            </h1>
+        </div>
+    </header>
 
+    <main style="padding: 30px 20px; color: white;">
+        <h2 style="margin-bottom: 25px; border-left: 4px solid rgb(248, 246, 249); padding-left: 15px;">
+            ${notification.contenu.titre}
+        </h2>
+        
+        <div style="background: rgb(96, 91, 91); border-radius: 8px; padding: 20px; backdrop-filter: blur(5px);">
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                <div style="font-size: 2em; color: #FFD700;">
+                    ${'★'.repeat(metadata.rating)}${'☆'.repeat(5 - metadata.rating)}
+                </div>
+                <div>
+                    <h3 style="margin: 0; color: #fff;">${metadata.productName}</h3>
+                    <p style="margin: 5px 0; color: #ccc;">Review ID: ${metadata.reviewId}</p>
+                </div>
+            </div>
+
+            ${metadata.comment ? `
+            <div style="background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px;">
+                <p style="margin: 0; font-style: italic; color: #e0e0e0;">
+                    "${metadata.comment}"
+                </p>
+            </div>
+            ` : ''}
+
+            <div style="margin-top: 20px; background: rgba(255, 254, 254, 0.1); padding: 15px; border-radius: 6px;">
+                <p style="margin: 10px 0;">
+                    <i class="fas fa-user" style="margin-right: 8px; color: #6a1b9a;"></i>
+                    <strong>Client:</strong> 
+                    <span style="color:rgb(246, 241, 241);">${metadata.customerName}</span>
+                </p>
+                
+                
+                </p>
+            </div>
+        </div>
+
+        
+    </main>
+
+    <footer style="background: rgb(82, 5, 106); padding: 20px; text-align: center; color: #d0d0d0; font-size: 0.9em;">
+        <p style="margin: 5px 0;">
+            © ${new Date().getFullYear()} Shoppingi 
+            <span style="color: #6a1b9a;">•</span> 
+            Tous droits réservés
+        </p>
+    </footer>
+</div>
+    `;
     }
     }
 }

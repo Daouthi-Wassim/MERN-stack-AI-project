@@ -8,7 +8,7 @@ const Review = require('../models/reviewSchema');
 const ReturnRequest = require("../models/returnSchema");
 const Payment = require("../models/paymentSchema");
 const Notification = require("../models/notificationSchema");
-
+const NotificationService = require('../routes/notificationService');
 const bcrypt = require('bcryptjs');
 
 
@@ -499,7 +499,7 @@ const adminController = {
     },
 
 
-    getReviewSellers: async(req, res) => {
+    getAVGReviewSellers: async(req, res) => {
         try {
             const sellerStats = await Review.aggregate([{
                     $group: {
@@ -540,7 +540,7 @@ const adminController = {
         }
     },
 
-    getReviewProducts: async(req, res) => {
+    getAVGReviewProducts: async(req, res) => {
         try {
             const productStats = await Review.aggregate([{
                     $group: {
@@ -733,6 +733,113 @@ const adminController = {
         }
     },
 
+    //  admin
+    getAdminStats: async(req, res) => {
+        try {
+            const stats = await Review.aggregate([{
+                    $group: {
+                        _id: "$product",
+                        averageRating: { $avg: "$rating" },
+                        totalReviews: { $sum: 1 },
+                        lowRatings: {
+                            $sum: { $cond: [{ $lte: ["$rating", 2] }, 1, 0] }
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "products",
+                        localField: "_id",
+                        foreignField: "_id",
+                        as: "product"
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "sellers",
+                        localField: "product.seller",
+                        foreignField: "_id",
+                        as: "seller"
+                    }
+                },
+                {
+                    $project: {
+                        productName: { $arrayElemAt: ["$product.productName", 0] },
+                        seller: { $arrayElemAt: ["$seller.shopName", 0] },
+                        averageRating: 1,
+                        totalReviews: 1,
+                        lowRatings: 1
+                    }
+                }
+            ]);
 
+            res.json({ success: true, data: stats });
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+
+    //update review comment (Admin)
+
+    updateReview: async(req, res) => {
+        try {
+
+            if (!req.body.comment) {
+                return res.status(400).json({
+                    success: false,
+                    message: "No comment"
+                });
+            }
+            const updatedReview = await Review.findByIdAndUpdate(
+                req.params.id, { comment: req.body.comment }, { new: true, runValidators: true }
+            );
+
+            if (!updatedReview) {
+                return res.status(404).json({
+                    success: false,
+                    message: "No Review"
+                });
+            }
+
+            res.json({
+                success: true,
+                data: updatedReview
+            });
+
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+    },
+    // delete review (Admin)
+    deleteReview: async(req, res) => {
+        try {
+            const deletedReview = await Review.findByIdAndDelete(req.params.id);
+
+            if (!deletedReview) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Review introuvable"
+                });
+            }
+
+            res.json({
+                success: true,
+                message: "Review supprimée avec succès"
+            });
+
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: error.message
+            });
+        }
+    }
 }
 module.exports = adminController;

@@ -9,7 +9,7 @@ const createNewToken = (user) => {
 
         // Create a clean payload object
         const payload = {
-            id: user._id ? user._id.toString() : "errreur", // Fixed syntax error in optional chaining
+            id: user._id ? user._id.toString() : "errreur",
             email: user.email,
             role: user.role
         };

@@ -17,7 +17,7 @@ app.use((req, res, next) => {
 });
 // Routes
 app.use('/api', require('./routes/route'));
-//app.use('/api/notifications', require('./routes/notificationRoutes'));
+
 // MongoDB connection
 mongoose.connect(process.env.MONGO_URL)
     .then(() => console.log('Connected to MongoDB'))
@@ -29,7 +29,7 @@ app.listen(PORT, () => {
 });
 
 
-// server.js
+
 
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 

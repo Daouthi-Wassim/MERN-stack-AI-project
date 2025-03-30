@@ -40,6 +40,15 @@ const reviewSchema = new mongoose.Schema({
     date: {
         type: Date,
         default: Date.now
+    },
+    verifiedPurchase: {
+        type: Boolean,
+        default: false
+    },
+    orderReference: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Order",
+        required: true
     }
 }, { timestamps: true });
 

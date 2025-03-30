@@ -8,13 +8,6 @@ const {
 } = require('../middleware/authMiddleware.js');
 
 
-const {
-    createReview,
-    getSellerStats,
-    getAdminStats,
-    updateReview,
-    deleteReview
-} = require('../controllers/reviewController');
 
 const {
 
@@ -24,28 +17,26 @@ const {
     getAllProducts,
     createAdmin,
     toggleProductStatus,
-    getReviewSellers,
-    getReviewProducts,
+    getAVGReviewSellers,
+    getAVGReviewProducts,
     addSeller,
     addcustomer,
     getsellers,
     getcustomers,
-
-
     getCustomerDetails,
-
     getPaymentDetails,
-
     getallReturnRequests,
-
-    getAdminNotifications
+    getAdminNotifications,
+    getAdminStats,
+    updateReview,
+    deleteReview
 
 } = require('../controllers/adminController.js');
 
 const {
     sellerRegister,
     sellerLogIn,
-
+    getAVGreviews,
     getPayments
 } = require('../controllers/sellerController.js');
 
@@ -76,6 +67,7 @@ const {
     createPayment,
     createReturn,
     processReturn,
+    createReview,
     getcustomerNotification,
     getcustomerReturnRequests
 } = require('../controllers/customerController.js');
@@ -106,17 +98,17 @@ router.post("/procereturns", authMiddleware, isSeller, processReturn);
 ///////reviews ////////////////////////
 
 // Seller routes
-router.get('/sellerReviews', authMiddleware, isSeller, getSellerStats);
+router.get('/sellerReviews', authMiddleware, isSeller, getAVGreviews);
 router.get("/seller/payments", authMiddleware, isSeller, getPayments);
 
 // Admin routes
-router.get('/admin/getsellersrev', authMiddleware, isAdmin, getReviewSellers);
-router.get('/admin/getproductsrev', authMiddleware, isAdmin, getReviewProducts);
+router.get('/admin/getsellersrev', authMiddleware, isAdmin, getAVGReviewSellers);
+router.get('/admin/getproductsrev', authMiddleware, isAdmin, getAVGReviewProducts);
 router.get('/admin/getallcusdetails/:id', authMiddleware, isAdmin, getCustomerDetails);
 router.put('/updaterev/:id', authMiddleware, isAdmin, updateReview);
 router.delete('/deleterev/:id', authMiddleware, isAdmin, deleteReview);
 
-router.post('/createReview', authMiddleware, createReview);
+router.post('/createReview', authMiddleware, isCustomer, createReview);
 
 /*
 router.get('/getuserrev', authMiddleware, getUserReviews);

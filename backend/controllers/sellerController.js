@@ -1,8 +1,15 @@
+const mongoose = require("mongoose");
 const bcrypt = require('bcrypt');
-const Seller = require('../models/sellerSchema.js');
+const Review = require('../models/reviewSchema');
+const Product = require('../models/productSchema.js')
+const Order = require('../models/orderSchema');
+const Customer = require('../models/customerSchema.js');
 const Admin = require('../models/adminSchema.js');
-const Return = require("../models/returnSchema");
-const Notification = require("../models/notificationSchema");
+const Seller = require('../models/sellerSchema');
+const NotificationService = require('../routes/notificationService.js');
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const Payment = require("../models/paymentSchema");
+const ReturnRequest = require("../models/returnSchema");
 const { createNewToken } = require('../utils/token.js');
 
 const sellerRegister = async(req, res) => {
@@ -116,10 +123,48 @@ const getPayments = async(req, res) => {
     }
 };
 
+const getAVGreviews = async(req, res) => {
+    try {
+        const stats = await Review.aggregate([
+            { $match: { seller: new mongoose.Types.ObjectId(req.user.id) } },
+            {
+                $group: {
+                    _id: "$product",
+                    averageRating: { $avg: "$rating" },
+                    totalReviews: { $sum: 1 },
+                    lastReview: { $max: "$createdAt" }
+                }
+            },
+            {
+                $lookup: {
+                    from: "products",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "product"
+                }
+            },
+            {
+                $project: {
+                    productName: { $arrayElemAt: ["$product.productName", 0] },
+                    averageRating: { $round: ["$averageRating", 1] },
+                    totalReviews: 1,
+                    lastReview: 1
+                }
+            }
+        ]);
 
+        res.json({ success: true, data: stats });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 module.exports = {
     sellerRegister,
     sellerLogIn,
-
+    getAVGreviews,
     getPayments
 };
