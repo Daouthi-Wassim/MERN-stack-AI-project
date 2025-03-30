@@ -50,8 +50,8 @@ const newOrder = async(req, res) => {
             );
 
             await NotificationService.create({
-                destinataire: sellerId,
-                modeleDestinataire: "Seller",
+                recipent: sellerId,
+                recipentmodel: "Seller",
                 type: "NOUVELLE_COMMANDE",
                 contenu: {
                     titre: "Nouvelle commande 📦",
@@ -63,8 +63,8 @@ const newOrder = async(req, res) => {
 
         // Notification à l'admin
         await NotificationService.create({
-            destinataire: process.env.ADMIN_ID,
-            modeleDestinataire: "Admin",
+            recipent: process.env.ADMIN_ID,
+            recipentmodel: "Admin",
             type: "NOUVELLE_COMMANDE",
             contenu: {
                 titre: "Nouvelle transaction 💰",
@@ -193,8 +193,8 @@ const updateOrderStatus = async(req, res) => {
 
             // Customer notification
             await NotificationService.create({
-                destinataire: order.buyer._id,
-                modeleDestinataire: 'Customer',
+                recipent: order.buyer._id,
+                recipentmodel: 'Customer',
                 type: 'ORDER_CANCELLED',
                 content: {
                     title: `Order #${order._id.toString().slice(-6)} cancelled`,
@@ -208,8 +208,8 @@ const updateOrderStatus = async(req, res) => {
             const sellers = [...new Set(order.orderedProducts.map(p => p.seller))];
             await Promise.all(sellers.map(async(sellerId) => {
                 await NotificationService.create({
-                    destinataire: sellerId,
-                    modeleDestinataire: 'Seller',
+                    recipent: sellerId,
+                    recipentmodel: 'Seller',
                     type: 'ORDER_CANCELLED',
                     content: {
                         title: `Order #${order._id.toString().slice(-6)} cancelled`,

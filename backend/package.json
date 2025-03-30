@@ -20,6 +20,7 @@
     "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
+    "mongoose-aggregate-paginate-v2": "^1.1.4",
     "nodemailer": "^6.10.0",
     "nodemon": "^2.0.22",
     "stripe": "^17.7.0",

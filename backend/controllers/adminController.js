@@ -716,7 +716,7 @@ const adminController = {
         try {
             const notifications = await Notification.find({
 
-                    modeleDestinataire: 'Admin',
+                    recipentmodel: 'Admin',
                 })
                 .sort("-createdAt")
                 .limit(100);
@@ -733,7 +733,7 @@ const adminController = {
         }
     },
 
-    //  admin
+
     getAdminStats: async(req, res) => {
         try {
             const stats = await Review.aggregate([{
@@ -783,7 +783,7 @@ const adminController = {
         }
     },
 
-    //update review comment (Admin)
+
 
     updateReview: async(req, res) => {
         try {
@@ -817,7 +817,7 @@ const adminController = {
             });
         }
     },
-    // delete review (Admin)
+
     deleteReview: async(req, res) => {
         try {
             const deletedReview = await Review.findByIdAndDelete(req.params.id);

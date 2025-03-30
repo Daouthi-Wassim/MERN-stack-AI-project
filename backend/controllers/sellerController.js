@@ -6,6 +6,7 @@ const Order = require('../models/orderSchema');
 const Customer = require('../models/customerSchema.js');
 const Admin = require('../models/adminSchema.js');
 const Seller = require('../models/sellerSchema');
+const Notification = require("../models/notificationSchema");
 const NotificationService = require('../routes/notificationService.js');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/paymentSchema");
@@ -162,9 +163,30 @@ const getAVGreviews = async(req, res) => {
         });
     }
 };
+const getSellerNotification = async(req, res) => {
+    try {
+        const notifications = await Notification.find({
+
+                recipentmodel: 'Seller',
+            })
+            .sort("-createdAt")
+            .limit(100);
+
+        res.json({
+            success: true,
+            data: notifications
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 module.exports = {
     sellerRegister,
     sellerLogIn,
     getAVGreviews,
-    getPayments
+    getPayments,
+    getSellerNotification
 };

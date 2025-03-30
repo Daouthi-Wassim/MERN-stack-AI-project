@@ -4,7 +4,7 @@ const {
     isCustomer,
     authMiddleware,
     isSeller,
-    //validateAdminFee
+
 } = require('../middleware/authMiddleware.js');
 
 
@@ -37,7 +37,8 @@ const {
     sellerRegister,
     sellerLogIn,
     getAVGreviews,
-    getPayments
+    getPayments,
+    getSellerNotification
 } = require('../controllers/sellerController.js');
 
 const {
@@ -89,6 +90,8 @@ router.post("/returns", authMiddleware, isCustomer, requestReturn);
 router.post("/createreturns", authMiddleware, isCustomer, createReturn);
 router.post("/procereturns", authMiddleware, isSeller, processReturn);
 
+router.get("/getnotifcust", authMiddleware, isCustomer, getcustomerNotification);
+router.get("/getreturnscust", authMiddleware, isCustomer, getcustomerReturnRequests);
 
 
 
@@ -100,6 +103,7 @@ router.post("/procereturns", authMiddleware, isSeller, processReturn);
 // Seller routes
 router.get('/sellerReviews', authMiddleware, isSeller, getAVGreviews);
 router.get("/seller/payments", authMiddleware, isSeller, getPayments);
+router.get("/sellernotif", authMiddleware, isSeller, getSellerNotification);
 
 // Admin routes
 router.get('/admin/getsellersrev', authMiddleware, isAdmin, getAVGReviewSellers);
@@ -110,10 +114,7 @@ router.delete('/deleterev/:id', authMiddleware, isAdmin, deleteReview);
 
 router.post('/createReview', authMiddleware, isCustomer, createReview);
 
-/*
-router.get('/getuserrev', authMiddleware, getUserReviews);
-router.get('/getev/:subjectType/:subjectId', getReviews);
-*/
+
 
 /////////////////////////////////////////////////
 

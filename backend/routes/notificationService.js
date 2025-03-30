@@ -15,7 +15,7 @@ class NotificationService {
             // 2. Création de la notification
             notification = new Notification({
                 ...notificationData,
-                status: 'En attente'
+                status: 'loading'
             });
 
             // 3. Sauvegarde transactionnelle
@@ -31,14 +31,14 @@ class NotificationService {
             }
 
             // 5. Mise à jour du statut
-            notification.status = 'Envoyée';
+            notification.status = 'Sended';
             await notification.save();
 
             return notification;
 
         } catch (error) {
             if (notification) {
-                notification.status = 'Échec';
+                notification.status = 'Failed';
                 await notification.save();
             }
             throw error;
@@ -50,10 +50,10 @@ class NotificationService {
     }
 
     static validateNotificationData(data) {
-        const requiredFields = ['destinataire', 'modeleDestinataire', 'type', 'contenu'];
+        const requiredFields = ['recipent', 'recipentmodel', 'type', 'contenu'];
         requiredFields.forEach(field => {
             if (!data[field]) {
-                throw new Error(`Champ requis manquant: ${field}`);
+                throw new Error(`Somthing missing: ${field}`);
             }
         });
     }
@@ -72,8 +72,8 @@ class NotificationService {
             });
 
             const recipient = await this.getRecipientInfo(
-                notification.destinataire,
-                notification.modeleDestinataire
+                notification.recipent,
+                notification.recipentmodel
             );
 
             const mailOptions = {
@@ -104,11 +104,11 @@ class NotificationService {
                 model = Admin;
                 break;
             default:
-                throw new Error('Type de destinataire invalide');
+                throw new Error('recipent type invalid');
         }
 
         const recipient = await model.findById(recipientId).select('email');
-        if (!recipient) throw new Error('Destinataire introuvable');
+        if (!recipient) throw new Error('Missing recipent');
         return recipient;
     }
 

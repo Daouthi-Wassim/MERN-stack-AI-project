@@ -6,6 +6,7 @@ const Order = require('../models/orderSchema');
 const Customer = require('../models/customerSchema.js');
 const Admin = require('../models/adminSchema.js');
 const Seller = require('../models/sellerSchema');
+const Notification = require("../models/notificationSchema");
 const NotificationService = require('../routes/notificationService.js');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/paymentSchema");
@@ -266,8 +267,8 @@ const createPayment = async(req, res) => {
         // 12. Notifications
         await Promise.all([
             NotificationService.create({
-                destinataire: order.buyer._id,
-                modeleDestinataire: 'Customer',
+                recipent: order.buyer._id,
+                recipentmodel: 'Customer',
                 type: 'PAIEMENT_REUSSI',
                 contenu: {
                     titre: `Payment Confirmed #${payment.transactionId}`,
@@ -289,13 +290,13 @@ const createPayment = async(req, res) => {
 
             NotificationService.create({
 
-                destinataire: updatedSeller._id,
-                modeleDestinataire: 'Seller',
+                recipent: updatedSeller._id,
+                recipentmodel: 'Seller',
                 type: 'CREDIT_SOLDE',
                 contenu: {
 
                     titre: `Hello, 
-                    other order confirmed #${order._id}`,
+                    Other order confirmed #${order._id}`,
                     message: `Your balance has increased by  ${sellerAmount}$`,
                     metadata: {
                         orderId: order._id,
@@ -311,8 +312,8 @@ const createPayment = async(req, res) => {
             }, { session }),
 
             NotificationService.create({
-                destinataire: updatedAdmin._id,
-                modeleDestinataire: 'Admin',
+                recipent: updatedAdmin._id,
+                recipentmodel: 'Admin',
                 type: 'COMMISSION',
                 contenu: {
                     titre: `New Commission #${payment.transactionId}`,
@@ -424,8 +425,8 @@ const createReturn = async(req, res) => {
 
         // 5. Notification au vendeur
         await NotificationService.create({
-            destinataire: order.orderedProducts[0].seller._id,
-            modeleDestinataire: "Seller",
+            recipent: order.orderedProducts[0].seller._id,
+            recipentmodel: "Seller",
             type: "RETURN_REQUEST",
             contenu: {
                 titre: "Nouvelle demande de retour",
@@ -523,8 +524,8 @@ const processReturn = async(req, res) => {
 
             // Notify customer about approval
             await NotificationService.create({
-                destinataire: returnRequest.customer, // remains an ObjectId from the original document
-                modeleDestinataire: "Customer",
+                recipent: returnRequest.customer, // remains an ObjectId from the original document
+                recipentmodel: "Customer",
                 type: "RETURN_APPROVED",
                 contenu: {
                     titre: "Return Approved",
@@ -545,8 +546,8 @@ const processReturn = async(req, res) => {
 
 
             await NotificationService.create({
-                destinataire: returnRequest.customer,
-                modeleDestinataire: "Customer",
+                recipent: returnRequest.customer,
+                recipentmodel: "Customer",
                 type: "RETURN_REJECTED",
                 contenu: {
                     titre: "Return Rejected",
@@ -577,8 +578,7 @@ const processReturn = async(req, res) => {
 const getcustomerNotification = async(req, res) => {
     try {
         const notifications = await Notification.find({
-
-                modeleDestinataire: 'Customer',
+                recipentmodel: 'Customer',
             })
             .sort("-createdAt")
             .limit(100);
@@ -659,7 +659,6 @@ const createReview = async(req, res) => {
             });
         }
 
-        // 4. Vérification du produit dans la commande
         const orderedProduct = order.orderedProducts.find(p =>
             p.product._id.toString() === productId
         );
@@ -710,8 +709,8 @@ const createReview = async(req, res) => {
 
         // 8. Notification au vendeur
         await NotificationService.create({
-            destinataire: orderedProduct.product.seller,
-            modeleDestinataire: 'Seller',
+            recipent: orderedProduct.product.seller,
+            recipentmodel: 'Seller',
             type: 'NEW_REVIEW',
             contenu: {
                 titre: "New review",

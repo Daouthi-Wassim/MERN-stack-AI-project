@@ -1,11 +1,11 @@
 const mongoose = require("mongoose");
 const notificationSchema = new mongoose.Schema({
-    destinataire: {
+    recipent: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
-        refPath: 'modeleDestinataire'
+        refPath: 'recipentmodel'
     },
-    modeleDestinataire: {
+    recipentmodel: {
         type: String,
         required: true,
         enum: ['Customer', 'Seller', 'Admin']
@@ -27,8 +27,8 @@ const notificationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['En attente', 'Envoyée', 'Échec'],
-        default: 'En attente'
+        enum: ['Failed', 'Sended', 'loading'],
+        default: 'loading'
     },
     lue: {
         type: Boolean,
