@@ -12,7 +12,7 @@ const notificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['PROMOTION', 'PAIEMENT_REUSSI', 'CREDIT_SOLDE', 'NOUVELLE_COMMANDE', 'COMMISSION', 'RETURN_REQUEST', 'RETURN_APPROVED', 'RETURN_REJECTED'],
+        enum: ['PROMOTION', 'PAIEMENT_REUSSI', 'CREDIT_SOLDE', 'NOUVELLE_COMMANDE', 'COMMISSION', 'RETURN_REQUEST', 'RETURN_APPROVED', 'RETURN_REJECTED', 'ORDER_CANCELLED', 'ORDER_DELIVERED', 'NEW_REVIEW '],
         required: true
     },
     contenu: {

@@ -222,6 +222,80 @@ class NotificationService {
                     <a href="${process.env.SUPPORT_URL}">Contacter le support</a>
                 </div>
             `;
+            case "RETURN_REJECTED":
+            return `
+                <div style="...">
+                    <h2>Demande de retour refusée</h2>
+                    <p>Raison: ${metadata.reason || "Non spécifiée"}</p>
+                    <a href="${process.env.SUPPORT_URL}">Contacter le support</a>
+                </div>
+            `;
+            case "ORDER_CANCELLED"||"ORDER_DELIVERED":
+                return `
+<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a;">
+    <header style="background: rgb(82, 5, 106); padding: 20px; text-align: center; border-bottom: 3px solid #6a1b9a;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <img src="" alt="Shoppingi Logo" style="max-width: 200px; height: auto;">
+            <h1 style="color: white; margin: 0; font-family: 'Arial Rounded MT Bold', sans-serif; letter-spacing: 2px;">
+                SHOPPINGI
+            </h1>
+        </div>
+    </header>
+
+    <main style="padding: 30px 20px; color: white;">
+        <h2 style="margin-bottom: 25px; border-left: 4px solid rgb(248, 246, 249); padding-left: 15px;">
+            ${notification.contenu.titre}
+        </h2>
+        <h3 style="margin-bottom: 25px; border-left: 4px solid rgb(4, 234, 69); padding-left: 15px;">
+            ${notification.contenu.message}
+        </h3>
+        <div style="background: rgb(96, 91, 91); border-radius: 8px; padding: 20px; backdrop-filter: blur(5px);">
+            ${metadata?.items ? `
+            <h3 style="color: rgb(248, 248, 248); margin-top: 0;">Order Details:</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                ${metadata.items.map(item => `
+                <tr style="border-bottom: 1px solid #333;">
+                    <td style="padding: 10px; color: #e0e0e0;">${item.name}</td>
+                    <td style="padding: 10px; text-align: right; color: #e0e0e0;">${item.quantity}x</td>
+                </tr>
+                `).join('')}
+            </table>
+            ` : ''}
+
+            <div style="margin-top: 20px; background: rgba(255, 254, 254, 0.1); padding: 15px; border-radius: 6px;">
+                ${metadata?.orderId ? `
+                <p style="margin: 10px 0;">
+                    <i class="fas fa-receipt" style="margin-right: 8px; color: #6a1b9a;"></i>
+                    <strong>Transaction ID:</strong> 
+                    <span style="color: rgb(246, 241, 241);">${metadata.orderId}</span>
+                </p>
+                ` : ''}
+
+                ${metadata?.totalAmount ? `
+                <p style="margin: 10px 0;">
+                    <i class="fas fa-wallet" style="margin-right: 8px; color: #00c853;"></i>
+                    <strong>Total:</strong> 
+                    <span style="color: #00c853; font-weight: 600;">${metadata.totalAmount}$</span>
+                </p>
+                ` : ''}
+            </div>
+        </div>
+
+        <p style="margin-top: 30px; color: #a8a8a8; text-align: center;">
+            Thank you for your trust in us!
+        </p>
+    </main>
+
+    <footer style="background: rgb(82, 5, 106); padding: 20px; text-align: center; color: #d0d0d0; font-size: 0.9em;">
+        <p style="margin: 5px 0;">
+            © ${new Date().getFullYear()} Shoppingi 
+            <span style="color: #6a1b9a;">•</span> 
+            All rights reserved
+        </p>
+    </footer>
+</div>
+`;
+
     }
     }
 }
