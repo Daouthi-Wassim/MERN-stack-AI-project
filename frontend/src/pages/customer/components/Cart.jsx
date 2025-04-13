@@ -8,8 +8,9 @@ import KeyboardDoubleArrowUpIcon from '@mui/icons-material/KeyboardDoubleArrowUp
 import { addToCart, removeAllFromCart, removeFromCart } from '../../../redux/userSlice';
 import { BasicButton, LightPurpleButton } from '../../../utils/buttonStyles';
 import { useNavigate } from 'react-router-dom';
-import { updateCustomer } from '../../../redux/userHandle';
-
+//import { updateCustomer } from '../../../redux/userHandle';
+//import { createNewOrder } from '../../../redux/userHandle';
+import axios from 'axios';
 const Cart = ({ setIsCartOpen }) => {
 
     const dispatch = useDispatch();
@@ -41,19 +42,87 @@ const Cart = ({ setIsCartOpen }) => {
         setIsCartOpen(false)
     }
 
-    const productBuyingHandler = (id) => {
-        console.log(currentUser);
-        dispatch(updateCustomer(currentUser, currentUser._id));
-        setIsCartOpen(false)
-        navigate(`/product/buy/${id}`)
-    }
+    const productBuyingHandler = async (item) => {
+           
+        
+            const orderData = {
+                buyer: currentUser._id,
+                shippingData: {
+                    address: currentUser.address || "Default Address",
+                    city: currentUser.city || "Default City",
+                    postalCode: currentUser.postalCode || "0000",
+                    country: currentUser.country || "Default Country",
+                },
+                orderedProducts: [{
+                    _id: item._id,
+                    productName: item.productName,
+                    seller: item.seller,
+                    price: item.price,
+                    quantity: 1 
+                }],
+                paymentInfo: {
+                    method: "Cash On Delivery",
+                    isPaid: false
+                },
+                productsQuantity: 1, // Quantité du produit acheté
+                totalPrice: item.price
+            };
+        
+            try {
+                const res = await axios.post('/api/orders/new', orderData);
+        
+                if (res.data.success) {
+                    alert("Order for this product created successfully!");
+                    dispatch(removeFromCart(item._id)); // Retirer l'article du panier
+                }
+            } catch (err) {
+                console.error("Order Error:", err);
+                alert("Error: " + (err.response?.data?.message || err.message));
+            } 
+        };
+        
 
-    const allProductsBuyingHandler = () => {
-        console.log(currentUser);
-        dispatch(updateCustomer(currentUser, currentUser._id));
-        setIsCartOpen(false)
-        navigate("/Checkout")
-    }
+    const allProductsBuyingHandler = async () => {
+       
+    const orderData = {
+        buyer: currentUser._id,
+        shippingData: {
+            address: currentUser.address || "Default Address",
+            city: currentUser.city || "Default City",
+            postalCode: currentUser.postalCode || "0000",
+            country: currentUser.country || "Default Country",
+        },
+        orderedProducts: cartDetails.map(item => ({
+            _id: item._id,
+            productName: item.productName,
+            seller: item.seller,
+            price: item.price.cost,
+            quantity: item.quantity // Quantité de chaque produit
+        })),
+        paymentInfo: {
+            method: "Cash On Delivery",
+            isPaid: false
+        },
+        productsQuantity: totalQuantity, // Quantité totale d'articles dans le panier
+        totalPrice: totalNewPrice // Prix total de tous les articles
+    };
+
+    try {
+        const res = await axios.post('/api/orders/new', orderData);
+
+        if (res.data.success) {
+            alert("Order created successfully!");
+            dispatch(removeAllFromCart()); 
+            setIsCartOpen(false); 
+            navigate('/orders'); 
+        }
+    } catch (err) {
+        console.error("Order Error:", err);
+        alert("Error: " + (err.response?.data?.message || err.message));
+    } 
+};
+    
+    
 
     const priceContainerRef = useRef(null);
 
@@ -70,6 +139,8 @@ const Cart = ({ setIsCartOpen }) => {
             firstCartItemRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     };
+
+    
     return (
         <StyledContainer>
             <TopContainer>

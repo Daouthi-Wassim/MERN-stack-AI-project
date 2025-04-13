@@ -147,7 +147,7 @@ const AuthenticationPage = ({ mode, role }) => {
                         }
 
                         <Box component="form" noValidate onSubmit={handleSubmit} sx={{ mt: 2 }}>
-                            {/* ... existing form fields ... */}
+
                             {mode === "Register" &&
                                 <TextField
                                     margin="normal"

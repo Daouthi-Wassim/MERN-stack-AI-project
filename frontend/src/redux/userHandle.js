@@ -37,7 +37,11 @@ const api = axios.create({
     }
 });
 
-
+api.interceptors.request.use(config => {
+    const token = localStorage.getItem('token');
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
+});
 
 export const addStuff = (address, fields) => async(dispatch) => {
     dispatch(authRequest());
@@ -168,29 +172,37 @@ api.interceptors.response.use(
     error => {
         console.error('API Error:', {
             status: error.response ? error.response.status : 'No response',
-            message: error.response ? {}.data ? {}.message : error.response.data : error.message,
+            message: error.response && error.response.data ? error.response.data.message : error.message,
             url: error.config ? error.config.url : 'No URL'
         });
         return Promise.reject(error);
     }
-)
+);
+
 
 // Update all other API calls to use the api instance
 export const authUser = (fields, role, mode) => async(dispatch) => {
     dispatch(authRequest());
     try {
         const result = await api.post(`/${role}${mode}`, fields);
+
         if (result.data.role) {
+
+            localStorage.setItem('token', result.data.token);
+
             dispatch(authSuccess(result.data));
             return result.data;
         }
+
         dispatch(authFailed(result.data.message));
         return null;
     } catch (error) {
-        dispatch(authError(error.response ? {}.data ? {}.message : 'Authentication failed' : error.message));
+        const errorMessage = error.response ? error.response.data ? error.response.message : 'Authentication failed' : 'Authentication failed';
+        dispatch(authError(errorMessage));
         return null;
     }
-}
+};
+
 
 
 
@@ -258,24 +270,7 @@ export const getSearchedProducts = (address, key) => async(dispatch) => {
     }
     // userHandle.js
 
-// Action pour récupérer les utilisateurs
-export const getUsers = () => async(dispatch) => {
-    try {
-        dispatch({ type: 'GET_USERS_REQUEST' });
 
-        const response = await axios.get('/admin/users'); // Assure-toi que cette URL est correcte
-
-        dispatch({
-            type: 'GET_USERS_SUCCESS',
-            payload: response.data, // Les utilisateurs récupérés depuis l'API
-        });
-    } catch (error) {
-        dispatch({
-            type: 'GET_USERS_FAILURE',
-            payload: error.message,
-        });
-    }
-};
 // Action pour ajouter un utilisateur
 export const addUser = (user) => async(dispatch) => {
     try {
@@ -308,21 +303,6 @@ export const updateUser = (user, id) => async(dispatch) => {
     }
 };
 
-// Action pour supprimer un utilisateur
-export const deleteUser = (id) => async(dispatch) => {
-    try {
-        await axios.delete(`/api/users/${id}`);
-        dispatch({
-            type: 'DELETE_USER_SUCCESS',
-            payload: id,
-        });
-    } catch (error) {
-        dispatch({
-            type: 'DELETE_USER_ERROR',
-            payload: error.message,
-        });
-    }
-};
 // ...existing code...
 
 export const getSellers = () => async(dispatch) => {
@@ -356,4 +336,232 @@ export const getSellerStats = async(sellerId) => {
     }
 };
 
-// ...existing code...
+// ...existing code...// Auth
+
+// userHandle.js
+
+// Gestion des notifications client
+export const getCustomerNotifications = () => async(dispatch) => {
+    dispatch(getRequest());
+    try {
+        const response = await api.get('/getnotifcust');
+        dispatch({
+            type: 'NOTIFICATIONS_LOADED',
+            payload: response.data.data
+        });
+    } catch (error) {
+        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+    }
+};
+
+// Création de demande de retour
+export const createReturnRequest = (returnData) => async(dispatch) => {
+    dispatch(authRequest());
+    try {
+        const response = await api.post('/createreturns', returnData);
+        dispatch({
+            type: 'RETURN_CREATED',
+            payload: response.data
+        });
+    } catch (error) {
+        dispatch(authError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+        throw error;
+    }
+};
+
+// Traitement des retours (vendeur/admin)
+export const processReturnRequest = (returnId, action) => async(dispatch) => {
+    dispatch(getRequest());
+    try {
+        const response = await api.post('/procereturns', { returnId, action });
+        dispatch({
+            type: 'RETURN_PROCESSED',
+            payload: response.data
+        });
+    } catch (error) {
+        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+    }
+};
+
+// Paiement Stripe
+export const handleStripePayment = (paymentData) => async(dispatch) => {
+    dispatch(authRequest());
+    try {
+
+        const token = localStorage.getItem('token');
+        console.log("Données envoyées à l'API :", paymentData);
+        const response = await api.post('/customer/createpayment', paymentData, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (response.data.clientSecret) {
+            dispatch({
+                type: 'PAYMENT_INTENT_CREATED',
+                payload: response.data
+            });
+            return response.data.clientSecret;
+        }
+
+    } catch (error) {
+        dispatch(authError(error.response ? error.response.data.message : error.message));
+        throw error;
+    }
+};
+
+// Gestion des avis
+export const submitProductReview = (reviewData) => async(dispatch) => {
+    dispatch(authRequest());
+    try {
+        const response = await api.post('/createReview', reviewData);
+        dispatch({
+            type: 'REVIEW_SUBMITTED',
+            payload: response.data
+        });
+        return response.data;
+    } catch (error) {
+        dispatch(authError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+        throw error;
+    }
+};
+
+// Récupération des commandes client
+export const fetchCustomerOrders = (customerId) => async(dispatch) => {
+    dispatch(getRequest());
+    try {
+        const response = await api.get(`/getOrderedProductsByCustomer/${customerId}`);
+        dispatch({
+            type: 'ORDERS_LOADED',
+            payload: response.data
+        });
+    } catch (error) {
+        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+        throw error;
+    }
+};
+
+// Mise à jour du profil client
+export const updateCustomerProfile = (userId, updateData) => async(dispatch) => {
+    dispatch(authRequest());
+    try {
+        const response = await api.put(`/CustomerUpdate/${userId}`, updateData);
+        dispatch(authSuccess(response.data));
+        return response.data;
+    } catch (error) {
+        dispatch(authError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+        throw error;
+    }
+};
+
+// Récupération des statistiques vendeur
+export const fetchSellerStats = (sellerId) => async(dispatch) => {
+    dispatch(getRequest());
+    try {
+        const response = await api.get(`/seller/payments`);
+        dispatch({
+            type: 'SELLER_STATS_LOADED',
+            payload: response.data.data
+        });
+    } catch (error) {
+        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+    }
+};
+
+
+
+// Intégration des webhooks Stripe
+export const handleStripeWebhook = (signature, payload) => async() => {
+    try {
+        const response = await api.post('/stripe-webhook', payload, {
+            headers: {
+                'stripe-signature': signature,
+                'Content-Type': 'application/json'
+            }
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Webhook error:', error);
+        throw error;
+    }
+};
+
+// Synchronisation du panier
+export const syncCartWithBackend = (cartData) => async(dispatch, getState) => {
+    try {
+        const { currentUser } = getState().user; // Accès via getState
+        const response = await api.put(`/CustomerUpdate/${currentUser._id}`, {
+            cartDetails: cartData
+        });
+        dispatch(updateCurrentUser(response.data));
+    } catch (error) {
+        console.error('Cart sync failed:', error);
+    }
+};
+
+// Récupération des demandes de retour client
+export const fetchCustomerReturns = (customerId) => async(dispatch) => {
+    dispatch(getRequest());
+    try {
+        const response = await api.get(`/getreturnscust?customerId=${customerId}`);
+        dispatch({
+            type: 'RETURNS_LOADED',
+            payload: response.data.data
+        });
+    } catch (error) {
+        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
+    }
+};
+export const createNewOrder = (orderData) => async(dispatch) => {
+    try {
+        const response = await api.post('/newOrder', orderData);
+        console.log("Order created:", response.data);
+        return response.data;
+    } catch (error) {
+        console.error(" Error creating order:", error.response ? error.response.data : error.message);
+        throw error;
+    }
+}; // Récupération des utilisateurs
+export const getUsers = (role) => async(dispatch) => {
+    try {
+        dispatch(getRequest());
+        const endpoint = {
+            customers: '/admin/getcustomers',
+            sellers: '/admin/getsellers',
+            admins: '/admin/getadmins'
+        }[role];
+
+        const response = await api.get(endpoint);
+        dispatch({ type: 'USERS_LOADED', payload: response.data });
+    } catch (error) {
+        dispatch(getError(error.message));
+    }
+};
+
+// Suppression d'un utilisateur
+export const deleteUser = (role, id) => async(dispatch) => {
+    try {
+        await api.delete(`/admin/deleteUsers/${role}/${id}`);
+        dispatch(getDeleteSuccess());
+        dispatch(getUsers(role)); // Recharger la liste
+    } catch (error) {
+        dispatch(getError(error.message));
+    }
+};
+
+// Création d'un utilisateur
+export const createUser = (role, userData) => async(dispatch) => {
+    try {
+        const endpoints = {
+            customer: '/admin/createcustomer',
+            seller: '/admin/createseller',
+            admin: '/admin/createadmin'
+        };
+
+        await api.post(endpoints[role], userData);
+        dispatch(stuffAdded());
+    } catch (error) {
+        dispatch(authError(error.message));
+    }
+};

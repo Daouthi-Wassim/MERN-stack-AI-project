@@ -29,10 +29,16 @@ const initialState = {
 
 
     users: [],
-
+    usersList: [],
     sellers: [],
     adminProducts: [],
     adminOrders: [],
+
+    notifications: [],
+    paymentIntent: null,
+    returns: [],
+    orders: [],
+    sellerStats: null
 };
 
 const updateCartDetailsInLocalStorage = (cartDetails) => {
@@ -314,7 +320,44 @@ const userSlice = createSlice({
             state.loading = false;
             state.error = null;
         },
+
     },
+    // userSlice.js
+
+    extraReducers: (builder) => {
+        builder
+            .addCase('NOTIFICATIONS_LOADED', (state, action) => {
+                state.notifications = action.payload;
+                state.loading = false;
+                state.error = null;
+            })
+            .addCase('RETURN_CREATED', (state, action) => {
+                state.returns.push(action.payload);
+                state.status = 'succeeded';
+                state.error = null;
+            })
+            .addCase('ORDERS_LOADED', (state, action) => {
+                state.orders = action.payload;
+                state.loading = false;
+                state.error = null;
+            })
+            .addCase('PAYMENT_INTENT_CREATED', (state, action) => {
+                state.paymentIntent = action.payload;
+                state.loading = false;
+                state.error = null;
+            })
+            .addMatcher(
+                (action) => action.type.endsWith('/rejected'),
+                (state, action) => {
+                    state.loading = false;
+                    state.error = action.error.message;
+                }
+            )
+            .addCase('USERS_LOADED', (state, action) => {
+                state.usersList = action.payload;
+                state.loading = false;
+            });
+    }
 });
 
 export const {
@@ -360,3 +403,11 @@ export const {
 } = userSlice.actions;
 
 export const userReducer = userSlice.reducer;
+
+export const selectCurrentUser = (state) => state.user.currentUser;
+export const selectCartTotal = (state) =>
+    state.user.currentUser ? state.user.currentUser.cartDetails ? state.user.currentUser.reduce(
+        (total, item) => total + (item.quantity * item.price.cost),
+        0
+    ) : 0 : 0;
+export const selectNotifications = (state) => state.user.notifications;

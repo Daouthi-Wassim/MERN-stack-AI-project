@@ -9,6 +9,16 @@ import Typography from '@mui/material/Typography';
 import ShippingPage from '../components/ShippingPage';
 import PaymentForm from '../components/PaymentForm';
 import OrderSummary from '../components/OrderSummary';
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+
+let stripePromise;
+
+if (process.env.REACT_APP_STRIPE_PUBLIC_KEY) {
+  stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLIC_KEY);
+} else {
+  console.error("Stripe public key is missing in .env file");
+}
 
 const steps = ['Shipping address', 'Review your order', 'Payment details',];
 
@@ -38,7 +48,7 @@ const CheckoutSteps = () => {
                             </Step>
                         ))}
                     </Stepper>
-                        <React.Fragment>
+                        <React.Fragment >
                             {activeStep === 0 &&
                                 <ShippingPage handleNext={handleNext} />
                             }
@@ -46,7 +56,9 @@ const CheckoutSteps = () => {
                                 <OrderSummary handleNext={handleNext} handleBack={handleBack} />
                             }
                             {activeStep === 2 &&
+                             <Elements stripe={stripePromise}>
                                 <PaymentForm handleBack={handleBack} />
+                                 </Elements>
                             }
                         </React.Fragment>
                 </Paper>

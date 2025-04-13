@@ -1,84 +1,109 @@
 import React, { useEffect, useState } from 'react';
-import Typography from '@mui/material/Typography';
-import Grid from '@mui/material/Grid';
-import TextField from '@mui/material/TextField';
-import { Box, Button } from '@mui/material';
+import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Typography, Box, Button, CircularProgress } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
-import { addStuff } from '../../../redux/userHandle';
 import { useNavigate, useParams } from 'react-router-dom';
+import { handleStripePayment, addStuff } from '../../../redux/userHandle';
 import Popup from '../../../components/Popup';
-import { fetchProductDetailsFromCart, removeAllFromCart, removeSpecificProduct } from '../../../redux/userSlice';
+import { removeAllFromCart, removeSpecificProduct } from '../../../redux/userSlice';
 
 const PaymentForm = ({ handleBack }) => {
-
-    const navigate = useNavigate()
-    const dispatch = useDispatch()
+    const stripe = useStripe();
+    const elements = useElements();
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
+    const { id: productID } = useParams();
 
     const { status, currentUser, productDetailsCart } = useSelector(state => state.user);
+    const [message, setMessage] = useState('');
+    const [showPopup, setShowPopup] = useState(false);
+    const [processing, setProcessing] = useState(false);
 
-    const params = useParams();
-    const productID = params.id;
-
-    const [paymentData, setPaymentData] = useState({
-        cardName: '',
-        cardNumber: '',
-        expDate: '',
-        cvv: '',
-    });
-
-    const handleInputChange = (e) => {
-        const { id, value } = e.target;
-        setPaymentData((prevData) => ({
-            ...prevData,
-            [id]: value,
-        }));
+    const calculateTotal = () => {
+        if (productID) {
+            return productDetailsCart?.price?.cost * productDetailsCart?.quantity || 0;
+        }
+        return currentUser.cartDetails.reduce((total, item) => total + (item.quantity * item.price.cost), 0);
     };
 
-    const [showPopup, setShowPopup] = useState(false);
-    const [message, setMessage] = useState("");
+    const createOrderData = () => {
+        const baseData = {
+            buyer: currentUser._id,
+            shippingData: currentUser.shippingData,
+            paymentInfo: { status: 'Pending' }
+        };
 
-    useEffect(() => {
-        if (productID) {
-            dispatch(fetchProductDetailsFromCart(productID));
+        return productID ? {
+            ...baseData,
+            orderedProducts: [productDetailsCart],
+            productsQuantity: productDetailsCart.quantity,
+            totalPrice: calculateTotal()
+        } : {
+            ...baseData,
+            orderedProducts: currentUser.cartDetails,
+            productsQuantity: currentUser.cartDetails.reduce((total, item) => total + item.quantity, 0),
+            totalPrice: calculateTotal()
+        };
+    };
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setProcessing(true);
+
+        if (!stripe || !elements) {
+            return;
         }
-    }, [productID, dispatch]);
 
-    const productsQuantity = currentUser.cartDetails.reduce((total, item) => total + item.quantity, 0);
-    const totalPrice = currentUser.cartDetails.reduce((total, item) => total + (item.quantity * item.price.cost), 0);
+        try {
+            
+            const amount = calculateTotal()*100; 
+            const { payload } = await dispatch(handleStripePayment({
+                amount,
+                currency: 'usd',
+                paymentMethodTypes: ['card'],
+                customerId: currentUser._id
+            }));
 
-    const singleProductQuantity = productDetailsCart && productDetailsCart.quantity
-    const totalsingleProductPrice = productDetailsCart && productDetailsCart.price && productDetailsCart.price.cost * productDetailsCart.quantity
+            if (!payload.clientSecret) {
+                throw new Error('Failed to create payment intent');
+            }
 
-    const paymentID = `${paymentData.cardNumber.slice(-4)}-${paymentData.expDate.slice(0, 2)}${paymentData.expDate.slice(-2)}-${Date.now()}`;
-    const paymentInfo = { id: paymentID, status: "Successful" }
+            // Step 2: Confirm Payment
+            const { error, paymentIntent } = await stripe.confirmCardPayment(payload.clientSecret, {
+                payment_method: {
+                    card: elements.getElement(CardElement),
+                    billing_details: {
+                        name: currentUser.name,
+                        email: currentUser.email
+                    }
+                }
+            });
 
-    const multiOrderData = {
-        buyer: currentUser._id,
-        shippingData: currentUser.shippingData,
-        orderedProducts: currentUser.cartDetails,
-        paymentInfo,
-        productsQuantity,
-        totalPrice,
-    }
+            if (error) throw error;
 
-    const singleOrderData = {
-        buyer: currentUser._id,
-        shippingData: currentUser.shippingData,
-        orderedProducts: productDetailsCart,
-        paymentInfo,
-        productsQuantity: singleProductQuantity,
-        totalPrice: totalsingleProductPrice,
-    }
+            // Step 3: Create Order
+            if (paymentIntent.status === 'succeeded') {
+                const orderData = {
+                    ...createOrderData(),
+                    paymentInfo: {
+                        id: paymentIntent.id,
+                        status: 'Completed'
+                    }
+                };
 
-    const handleSubmit = (e) => {
-        e.preventDefault()
-        if (productID) {
-            dispatch(addStuff("newOrder", singleOrderData));
-            dispatch(removeSpecificProduct(productID));
-        }
-        else {
-            dispatch(addStuff("newOrder", multiOrderData));
-            dispatch(removeAllFromCart());
+                dispatch(addStuff("newOrder", orderData));
+
+                // Clear cart
+                productID 
+                    ? dispatch(removeSpecificProduct(productID))
+                    : dispatch(removeAllFromCart());
+            }
+
+        } catch (error) {
+            setMessage(error.message || 'Payment failed');
+            setShowPopup(true);
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -86,92 +111,60 @@ const PaymentForm = ({ handleBack }) => {
         if (status === 'added') {
             navigate('/Aftermath');
         }
-        else if (status === 'failed') {
-            setMessage("Order Failed")
-            setShowPopup(true)
-        }
-        else if (status === 'error') {
-            setMessage("Network Error")
-            setShowPopup(true)
-        }
     }, [status, navigate]);
 
     return (
-        <React.Fragment>
-            <Typography variant="h6" gutterBottom>
-                Payment method
+        <Box sx={{ maxWidth: 600, margin: '0 auto' }}>
+            <Typography variant="h5" gutterBottom>
+                Secure Payment
             </Typography>
+
             <form onSubmit={handleSubmit}>
-                <Grid container spacing={3}>
-                    <Grid item xs={12} md={6}>
-                        <TextField
-                            required
-                            id="cardName"
-                            label="Name on card"
-                            fullWidth
-                            autoComplete="cc-name"
-                            variant="standard"
-                            value={paymentData.cardName}
-                            onChange={handleInputChange}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                        <TextField
-                            required
-                            id="cardNumber"
-                            label="Card number"
-                            type='number'
-                            fullWidth
-                            autoComplete="cc-number"
-                            variant="standard"
-                            value={paymentData.cardNumber}
-                            onChange={handleInputChange}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                        <TextField
-                            required
-                            id="expDate"
-                            type='date'
-                            helperText="Expiry date"
-                            fullWidth
-                            autoComplete="cc-exp"
-                            variant="standard"
-                            value={paymentData.expDate}
-                            onChange={handleInputChange}
-                        />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                        <TextField
-                            required
-                            id="cvv"
-                            label="CVV"
-                            type='number'
-                            helperText="Last three digits on signature strip"
-                            fullWidth
-                            autoComplete="cc-csc"
-                            variant="standard"
-                            value={paymentData.cvv}
-                            onChange={handleInputChange}
-                        />
-                    </Grid>
-                </Grid>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button onClick={handleBack} sx={{ mt: 3, ml: 1 }}>
+                <Box sx={{ mb: 3 }}>
+                    <CardElement
+                        options={{
+                            style: {
+                                base: {
+                                    fontSize: '16px',
+                                    color: '#424770',
+                                    '::placeholder': { color: '#aab7c4' }
+                                },
+                                invalid: {
+                                    color: '#9e2146'
+                                }
+                            }
+                        }}
+                    />
+                </Box>
+
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <Button 
+                        variant="outlined" 
+                        onClick={handleBack}
+                        disabled={processing}
+                    >
                         Back
                     </Button>
+                    
                     <Button
+                        type="submit"
                         variant="contained"
-                        type='submit'
-                        sx={{ mt: 3, ml: 1 }}
+                        color="primary"
+                        disabled={!stripe || processing}
+                        startIcon={processing && <CircularProgress size={20} />}
                     >
-                        Place order
+                        {processing ? 'Processing...' : `Pay $${calculateTotal().toFixed(2)}`}
                     </Button>
                 </Box>
             </form>
-            <Popup message={message} setShowPopup={setShowPopup} showPopup={showPopup} />
-        </React.Fragment>
+
+            <Popup 
+                message={message} 
+                showPopup={showPopup} 
+                setShowPopup={setShowPopup} 
+            />
+        </Box>
     );
-}
+};
 
 export default PaymentForm;
