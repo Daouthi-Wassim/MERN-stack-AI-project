@@ -37,7 +37,7 @@ const productSchema = new mongoose.Schema({
     reviews: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Review',
-        required: true
+        //required: true
     },
     seller: {
         type: mongoose.Schema.Types.ObjectId,

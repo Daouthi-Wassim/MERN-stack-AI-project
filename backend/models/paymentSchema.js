@@ -4,17 +4,17 @@ const paymentSchema = new mongoose.Schema({
     order: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Order",
-        required: true
+        // required: true
     },
     customer: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Customer",
-        required: true
+        //required: true
     },
     seller: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Seller",
-        required: true
+        //required: true
     },
     amount: {
         type: Number,
@@ -33,7 +33,7 @@ const paymentSchema = new mongoose.Schema({
     },
     transactionId: {
         type: String,
-        required: true,
+        // required: true,
         unique: true,
         index: true
     },

@@ -115,9 +115,7 @@ router.delete('/deleterev/:id', authMiddleware, isAdmin, deleteReview);
 router.post('/createReview', authMiddleware, isCustomer, createReview);
 
 
-
 /////////////////////////////////////////////////
-
 // Admin Routes
 router.post('/admin/createadmin', authMiddleware, isAdmin, createAdmin);
 router.post('/admin/createseller', authMiddleware, isAdmin, addSeller);
@@ -154,12 +152,10 @@ router.put('/addReview/:id', addReview);
 router.get('/searchProduct/:key', searchProduct);
 router.get('/searchProductbyCategory/:key', searchProductbyCategory);
 router.get('/searchProductbySubCategory/:key', searchProductbySubCategory);
-
 router.delete('/DeleteProduct/:id', deleteProduct);
 router.delete('/DeleteProducts/:id', deleteProducts);
 //router.put('/deleteProductReview/:id', deleteProductReview);
 //router.delete('/deleteAllProductReviews/:id', deleteAllProductReviews);
-
 // Customer
 router.post('/CustomerRegister', customerRegister);
 router.post('/CustomerLogin', customerLogIn);
@@ -170,6 +166,4 @@ router.put('/CustomerUpdate/:id', cartUpdate);
 router.post('/newOrder', authMiddleware, newOrder);
 router.get('/getOrderedProductsByCustomer/:id', authMiddleware, isAdmin, getOrderedProductsByCustomer);
 router.get('/getOrderedProductsBySeller/:id', authMiddleware, getOrderedProductsBySeller);
-
-
 module.exports = router;

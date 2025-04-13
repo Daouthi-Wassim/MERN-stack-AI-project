@@ -1,9 +1,6 @@
 const mongoose = require("mongoose");
 const Product = require('../models/productSchema.js')
 const Order = require('../models/orderSchema');
-const Customer = require('../models/customerSchema.js');
-const Admin = require('../models/adminSchema.js');
-const Seller = require('../models/sellerSchema');
 const NotificationService = require('../routes/notificationService.js');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/paymentSchema");
@@ -23,7 +20,7 @@ const newOrder = async(req, res) => {
         if (!orderedProducts || orderedProducts.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "Le panier ne peut pas être vide"
+                message: "Your cart is empty"
             });
         }
 
@@ -54,8 +51,8 @@ const newOrder = async(req, res) => {
                 recipentmodel: "Seller",
                 type: "NOUVELLE_COMMANDE",
                 contenu: {
-                    titre: "Nouvelle commande 📦",
-                    message: `Vous avez ${sellerProducts.length} article(s) à préparer pour la commande #${order._id.toString().slice(-6)}`
+                    titre: "New order!",
+                    message: `you have ${sellerProducts.length} products ready ordred #${order._id.toString().slice(-6)}`
                 },
                 channel: ["EMAIL", "IN_APP"]
             });
@@ -67,8 +64,8 @@ const newOrder = async(req, res) => {
             recipentmodel: "Admin",
             type: "NOUVELLE_COMMANDE",
             contenu: {
-                titre: "Nouvelle transaction 💰",
-                message: `Commande #${order._id.toString().slice(-6)} créée - Montant : ${totalPrice}€`
+                titre: "New transaction ",
+                message: `Order ID #${order._id.toString().slice(-6)} created - Total Price : ${totalPrice}TND`
             },
             channel: ["EMAIL", "IN_APP"]
         });
@@ -76,17 +73,17 @@ const newOrder = async(req, res) => {
         res.status(201).json({
             success: true,
             data: order,
-            message: "Commande créée avec succès"
+            message: "Order created "
         });
 
     } catch (err) {
-        console.error("Erreur création commande:", err);
+        console.error("Error :", err);
 
         // Gestion des erreurs de validation
         if (err.name === 'ValidationError') {
             return res.status(400).json({
                 success: false,
-                message: "Données de commande invalides",
+                message: "Data invalid",
                 errors: Object.values(err.errors).map(e => e.message)
             });
         }
@@ -94,7 +91,7 @@ const newOrder = async(req, res) => {
         res.status(500).json({
             success: false,
             message: process.env.NODE_ENV === 'development' ?
-                err.message : "Erreur lors de la création de la commande"
+                err.message : "Erreur when create this order"
         });
     }
 };

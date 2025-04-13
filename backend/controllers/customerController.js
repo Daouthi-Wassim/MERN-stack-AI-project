@@ -120,11 +120,10 @@ const getCartDetail = async(req, res) => {
 
 const cartUpdate = async(req, res) => {
     try {
-
-        let customer = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true })
-
-        return res.send(customer.cartDetails);
-
+        const customer = await Customer.findByIdAndUpdate(
+            req.params.id, { $set: req.body }, { new: true }
+        );
+        res.send(customer);
     } catch (err) {
         res.status(500).json(err);
     }
