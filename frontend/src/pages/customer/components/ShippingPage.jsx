@@ -4,11 +4,11 @@ import Typography from '@mui/material/Typography';
 import TextField from '@mui/material/TextField';
 import { Box, Button, Collapse, Stack, styled } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateCustomer } from '../../../redux/userHandle';
+import { updateCustomer, createNewOrder} from '../../../redux/userHandle';
 import { KeyboardArrowDown, KeyboardArrowUp } from '@mui/icons-material';
 import { BlueButton, GreenButton } from '../../../utils/buttonStyles';
 import { useNavigate } from 'react-router-dom';
-
+import { removeAllFromCart } from '../../../redux/userSlice';
 const ShippingPage = ({ handleNext, profile }) => {
   const { currentUser } = useSelector(state => state.user);
 
@@ -75,14 +75,14 @@ const ShippingPage = ({ handleNext, profile }) => {
       newErrors.country = '';
     }
 
-    if (formData.pinCode.trim() === '' || isNaN(formData.pinCode) || formData.pinCode.length !== 6) {
-      newErrors.pinCode = 'Pin Code is required and should be a 6-digit number';
+    if (formData.pinCode.trim() === '' || isNaN(formData.pinCode) || formData.pinCode.length !== 4) {
+      newErrors.pinCode = 'Pin Code is required and should be a 4-digit number';
     } else {
       newErrors.pinCode = '';
     }
 
-    if (formData.phoneNo.trim() === '' || isNaN(formData.phoneNo) || formData.phoneNo.length !== 10) {
-      newErrors.phoneNo = 'Phone Number is required and should be a 10-digit number';
+    if (formData.phoneNo.trim() === '' || isNaN(formData.phoneNo) || formData.phoneNo.length !== 8) {
+      newErrors.phoneNo = 'Phone Number is required and should be a 8-digit number';
     } else {
       newErrors.phoneNo = '';
     }
@@ -118,11 +118,59 @@ const ShippingPage = ({ handleNext, profile }) => {
     dispatch(updateCustomer(updatedUser, currentUser._id));
   };
 
-  const handleSubmit = () => {
-    if (validateInputs()) {
-      updateShippingData(formData);
-      handleNext();
-    }
+  const handleSubmit = async () => {
+  
+      try {
+        // 1. Update shipping data
+        await updateShippingData(formData);
+  
+        // 2. Create order data
+        const cartDetails = currentUser.cartDetails;
+        
+        // Group products by seller
+        const productsBySeller = cartDetails.reduce((acc, item) => {
+          if (!acc[item.seller]) {
+            acc[item.seller] = [];
+          }
+          acc[item.seller].push(item);
+          return acc;
+        }, {});
+  
+        // Create orders for each seller
+        for (const [sellerId, items] of Object.entries(productsBySeller)) {
+          const orderData = {
+            buyer: currentUser._id,
+            shippingData: formData,
+            orderedProducts: items.map(item => ({
+              product: item._id,
+              quantity: item.quantity,
+              seller: sellerId
+            })),
+            totalPrice: items.reduce((total, item) => 
+              total + (item.price.cost * item.quantity), 0
+            ),
+            orderStatus: "Processing"
+          };
+  
+          // Create order
+          const result = await dispatch(createNewOrder(orderData)).unwrap();
+          
+          if (result.success) {
+            // Store order info for payment
+            localStorage.setItem('currentOrderId', result.data._id);
+            localStorage.setItem('orderAmount', orderData.totalPrice);
+            await dispatch(removeAllFromCart()).unwrap();
+            handleNext();
+          } else {
+            throw new Error(result.message || 'Failed to create order');
+          }
+        }
+  
+      } catch (error) {
+        console.error('Order creation error:', error);
+        alert('Failed to create order: ' + error.message);
+      }
+    
   };
 
   const profileSubmitHandler = () => {
@@ -133,10 +181,10 @@ const ShippingPage = ({ handleNext, profile }) => {
 
   const editHandler = (event) => {
     event.preventDefault()
-    if (isNaN(pinCode) || pinCode.length !== 6) {
+    if (isNaN(pinCode) || pinCode.length !== 4) {
       setPinCodeError(true)
     }
-    else if (isNaN(phoneNo) || phoneNo.length !== 10) {
+    else if (isNaN(phoneNo) || phoneNo.length !== 8) {
       setPhoneNoError(true)
     }
     else {
@@ -192,10 +240,10 @@ const ShippingPage = ({ handleNext, profile }) => {
                 </GreenButton>
                 <Button
                   variant="contained"
-                  onClick={handleNext}
+                  onClick={handleSubmit}
                   sx={{ mt: 3, ml: 1 }}
                 >
-                  Next
+                  Create Order
                 </Button>
               </Box>
             }
@@ -246,7 +294,7 @@ const ShippingPage = ({ handleNext, profile }) => {
                         type='number'
                         value={pinCode}
                         error={pinCodeError}
-                        helperText={pinCodeError && 'Pin Code should be a 6-digit number'}
+                        helperText={pinCodeError && 'Pin Code should be a 4-digit number'}
                         onChange={(event) => setPinCode(event.target.value)}
                         required
                         InputLabelProps={{
@@ -279,7 +327,7 @@ const ShippingPage = ({ handleNext, profile }) => {
                         type='number'
                         value={phoneNo}
                         error={phoneNoError}
-                        helperText={phoneNoError && 'Phone Number should be a 10-digit number'}
+                        helperText={phoneNoError && 'Phone Number should be a 8-digit number'}
                         onChange={(event) => setPhoneNo(event.target.value)}
                         required
                         InputLabelProps={{

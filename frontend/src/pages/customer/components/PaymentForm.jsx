@@ -3,9 +3,9 @@ import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Typography, Box, Button, CircularProgress } from '@mui/material';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useParams } from 'react-router-dom';
-import { handleStripePayment, addStuff } from '../../../redux/userHandle';
+import { handleStripePayment } from '../../../redux/userHandle';
 import Popup from '../../../components/Popup';
-import { removeAllFromCart, removeSpecificProduct } from '../../../redux/userSlice';
+import { removeAllFromCart} from '../../../redux/userSlice';
 
 const PaymentForm = ({ handleBack }) => {
     const stripe = useStripe();
@@ -26,7 +26,7 @@ const PaymentForm = ({ handleBack }) => {
         return currentUser.cartDetails.reduce((total, item) => total + (item.quantity * item.price.cost), 0);
     };
 
-    const createOrderData = () => {
+   /* const createOrderData = () => {
         const baseData = {
             buyer: currentUser._id,
             shippingData: currentUser.shippingData,
@@ -44,8 +44,12 @@ const PaymentForm = ({ handleBack }) => {
             productsQuantity: currentUser.cartDetails.reduce((total, item) => total + item.quantity, 0),
             totalPrice: calculateTotal()
         };
-    };
-
+    };*/
+    
+    
+    const orderId = localStorage.getItem('currentOrderId');
+    const orderAmount = parseFloat(localStorage.getItem('orderAmount')) || 0;
+  
     const handleSubmit = async (event) => {
         event.preventDefault();
         setProcessing(true);
@@ -55,56 +59,54 @@ const PaymentForm = ({ handleBack }) => {
         }
 
         try {
-            
-            const amount = calculateTotal()*100; 
+          
             const { payload } = await dispatch(handleStripePayment({
-                amount,
-                currency: 'usd',
-                paymentMethodTypes: ['card'],
-                customerId: currentUser._id
+              orderId,
+              amount: orderAmount * 100,
+              currency: 'usd'
             }));
-
+      
             if (!payload.clientSecret) {
-                throw new Error('Failed to create payment intent');
+              throw new Error('Failed to create payment intent');
             }
 
-            // Step 2: Confirm Payment
-            const { error, paymentIntent } = await stripe.confirmCardPayment(payload.clientSecret, {
-                payment_method: {
-                    card: elements.getElement(CardElement),
-                    billing_details: {
-                        name: currentUser.name,
-                        email: currentUser.email
-                    }
-                }
-            });
-
-            if (error) throw error;
-
-            // Step 3: Create Order
-            if (paymentIntent.status === 'succeeded') {
-                const orderData = {
-                    ...createOrderData(),
-                    paymentInfo: {
-                        id: paymentIntent.id,
-                        status: 'Completed'
-                    }
-                };
-
-                dispatch(addStuff("newOrder", orderData));
-
-                // Clear cart
-                productID 
-                    ? dispatch(removeSpecificProduct(productID))
-                    : dispatch(removeAllFromCart());
+            // Confirm card payment
+      const { error, paymentIntent } = await stripe.confirmCardPayment(
+        payload.clientSecret,
+        {
+          payment_method: {
+            card: elements.getElement(CardElement),
+            billing_details: {
+              name: currentUser.name,
+              email: currentUser.email
             }
-
-        } catch (error) {
-            setMessage(error.message || 'Payment failed');
-            setShowPopup(true);
-        } finally {
-            setProcessing(false);
+          }
         }
+      );
+      if (error) {
+        throw error;
+      }
+
+      if (paymentIntent.status === 'succeeded') {
+        // Clear stored order info
+
+        localStorage.removeItem('currentOrderId');
+        localStorage.removeItem('orderAmount');
+        
+        // Clear cart
+        dispatch(removeAllFromCart());
+        
+        // Navigate to success page
+        navigate('/Aftermath');
+      }
+
+
+    } catch (error) {
+        setMessage(error.message || 'Payment failed');
+        setShowPopup(true);
+      } finally {
+        setProcessing(false);
+      }
     };
 
     useEffect(() => {

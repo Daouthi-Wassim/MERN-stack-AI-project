@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { createAsyncThunk } from '@reduxjs/toolkit';
+
 import {
 
 
@@ -23,8 +25,8 @@ import {
     updateFailed,
     getCustomersListFailed,
     customersListSuccess,
-    getSpecificProductsFailed,
-    specificProductSuccess,
+
+
     updateCurrentUser,
 } from './userSlice';
 
@@ -238,20 +240,7 @@ export const getCustomers = (id, address) => async(dispatch) => {
     }
 }
 
-export const getSpecificProducts = (id, address) => async(dispatch) => {
-    dispatch(getRequest());
-    try {
-        const result = await axios.get(`${REACT_APP_BASE_URL}/${address}/${id}`);
-        if (result.data.message) {
-            dispatch(getSpecificProductsFailed(result.data.message));
-        } else {
-            dispatch(specificProductSuccess(result.data));
-        }
 
-    } catch (error) {
-        dispatch(getError(error));
-    }
-}
 
 export const getSearchedProducts = (address, key) => async(dispatch) => {
         dispatch(getRequest());
@@ -271,117 +260,8 @@ export const getSearchedProducts = (address, key) => async(dispatch) => {
     // userHandle.js
 
 
-// Action pour ajouter un utilisateur
-export const addUser = (user) => async(dispatch) => {
-    try {
-        const response = await axios.post('/api/users', user);
-        dispatch({
-            type: 'ADD_USER_SUCCESS',
-            payload: response.data,
-        });
-    } catch (error) {
-        dispatch({
-            type: 'ADD_USER_ERROR',
-            payload: error.message,
-        });
-    }
-};
 
-// Action pour mettre à jour un utilisateur
-export const updateUser = (user, id) => async(dispatch) => {
-    try {
-        const response = await axios.put(`/api/users/${id}`, user);
-        dispatch({
-            type: 'UPDATE_USER_SUCCESS',
-            payload: response.data,
-        });
-    } catch (error) {
-        dispatch({
-            type: 'UPDATE_USER_ERROR',
-            payload: error.message,
-        });
-    }
-};
 
-// ...existing code...
-
-export const getSellers = () => async(dispatch) => {
-    dispatch(getRequest());
-    try {
-        const response = await api.get('/admin/users');
-        dispatch({
-            type: 'GET_SELLERS_SUCCESS',
-            payload: response.data
-        });
-    } catch (error) {
-        dispatch(getError(error.response ? {}.data ? {}.message : error.message : error.message));
-    }
-};
-
-export const deleteSeller = async(sellerId) => {
-    try {
-        const response = await api.delete(`/admin/users/sellers/${sellerId}`);
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
-};
-
-export const getSellerStats = async(sellerId) => {
-    try {
-        const response = await api.get(`/admin/users/seller-stats/${sellerId}`);
-        return response.data;
-    } catch (error) {
-        throw error;
-    }
-};
-
-// ...existing code...// Auth
-
-// userHandle.js
-
-// Gestion des notifications client
-export const getCustomerNotifications = () => async(dispatch) => {
-    dispatch(getRequest());
-    try {
-        const response = await api.get('/getnotifcust');
-        dispatch({
-            type: 'NOTIFICATIONS_LOADED',
-            payload: response.data.data
-        });
-    } catch (error) {
-        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
-    }
-};
-
-// Création de demande de retour
-export const createReturnRequest = (returnData) => async(dispatch) => {
-    dispatch(authRequest());
-    try {
-        const response = await api.post('/createreturns', returnData);
-        dispatch({
-            type: 'RETURN_CREATED',
-            payload: response.data
-        });
-    } catch (error) {
-        dispatch(authError(error.response ? error.response.data ? error.response.message : error.message : error.message));
-        throw error;
-    }
-};
-
-// Traitement des retours (vendeur/admin)
-export const processReturnRequest = (returnId, action) => async(dispatch) => {
-    dispatch(getRequest());
-    try {
-        const response = await api.post('/procereturns', { returnId, action });
-        dispatch({
-            type: 'RETURN_PROCESSED',
-            payload: response.data
-        });
-    } catch (error) {
-        dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
-    }
-};
 
 // Paiement Stripe
 export const handleStripePayment = (paymentData) => async(dispatch) => {
@@ -490,7 +370,7 @@ export const handleStripeWebhook = (signature, payload) => async() => {
 // Synchronisation du panier
 export const syncCartWithBackend = (cartData) => async(dispatch, getState) => {
     try {
-        const { currentUser } = getState().user; // Accès via getState
+        const { currentUser } = getState().user;
         const response = await api.put(`/CustomerUpdate/${currentUser._id}`, {
             cartDetails: cartData
         });
@@ -513,44 +393,199 @@ export const fetchCustomerReturns = (customerId) => async(dispatch) => {
         dispatch(getError(error.response ? error.response.data ? error.response.message : error.message : error.message));
     }
 };
-export const createNewOrder = (orderData) => async(dispatch) => {
+export const createNewOrder = createAsyncThunk(
+    'order/createNewOrder',
+    async(orderData, { rejectWithValue }) => {
+        try {
+            console.log('Creating order with data:', orderData);
+            const response = await api.post('/newOrder', orderData);
+
+            if (!response.data) {
+                throw new Error('No response from server');
+            }
+
+            console.log('Order creation response:', response.data);
+            return response.data;
+
+        } catch (error) {
+            console.error('Order creation error:', error);
+            return rejectWithValue(error.response ? error.response.data : {
+                success: false,
+                message: error.message
+            });
+        }
+    }
+);
+
+export const getSpecificProducts = createAsyncThunk(
+    'user/getSpecificProducts',
+    async({ customerId }, { rejectWithValue }) => {
+        try {
+            const response = await api.get(`/getOrderedProductsByCustomer/${customerId}`);
+            console.log('API Response:', response.data);
+
+            if (!response.data.success) {
+                throw new Error(response.data.message);
+            }
+
+            return response.data;
+        } catch (error) {
+            console.error('API Error:', error);
+            return rejectWithValue(error.message);
+        }
+    }
+);
+// ADMIN ACTIONS
+export const getAdminStats = async() => {
     try {
-        const response = await api.post('/newOrder', orderData);
-        console.log("Order created:", response.data);
+        const response = await api.get('/admin/dashboard-stats');
         return response.data;
     } catch (error) {
-        console.error(" Error creating order:", error.response ? error.response.data : error.message);
         throw error;
-    }
-}; // Récupération des utilisateurs
-export const getUsers = (role) => async(dispatch) => {
-    try {
-        dispatch(getRequest());
-        const endpoint = {
-            customers: '/admin/getcustomers',
-            sellers: '/admin/getsellers',
-            admins: '/admin/getadmins'
-        }[role];
-
-        const response = await api.get(endpoint);
-        dispatch({ type: 'USERS_LOADED', payload: response.data });
-    } catch (error) {
-        dispatch(getError(error.message));
     }
 };
 
-// Suppression d'un utilisateur
+export const getAdminNotifications = async() => {
+    try {
+        const response = await api.get('/admin/getAdminnotif');
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+export const getUsers = createAsyncThunk(
+    'users/getUsers',
+    async(role) => {
+        try {
+            const endpoint = {
+                'admins': '/admin/getadmins',
+                'sellers': '/admin/getsellers',
+                'customers': '/admin/getcustomers'
+            }[role];
+
+            const response = await api.get(endpoint);
+            console.log('API Response:', response.data);
+            if (Array.isArray(response.data)) return response.data;
+            if (response.data.users) return response.data.users;
+            if (response.data.data) return response.data.data;
+            return [];
+        } catch (error) {
+            console.error('API Error:', error);
+            throw error;
+        }
+    }
+);
+
+// SELLER ACTIONS
+export const getSellerStats = async(sellerId) => {
+    try {
+        const response = await api.get('/seller/payments');
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getSellerNotifications = async() => {
+    try {
+        const response = await api.get('/sellernotif');
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// CUSTOMER ACTIONS
+export const getCustomerNotifications = async() => {
+    try {
+        const response = await api.get('/getnotifcust');
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// ORDER ACTIONS
+export const createOrder = async(orderData) => {
+    try {
+        const response = await api.post('/newOrder', orderData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const updateOrderStatus = async(orderId, status) => {
+    try {
+        const response = await api.put(`/seller/orders/${orderId}/status`, { status });
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// PRODUCT ACTIONS
+export const createProduct = async(productData) => {
+    try {
+        const response = await api.post('/ProductCreate', productData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+
+
+// RETURN REQUEST ACTIONS
+export const createReturnRequest = async(returnData) => {
+    try {
+        const response = await api.post('/createreturns', returnData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const processReturn = async(returnData) => {
+    try {
+        const response = await api.post('/procereturns', returnData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// REVIEW ACTIONS
+export const createReview = async(reviewData) => {
+    try {
+        const response = await api.post('/createReview', reviewData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// PAYMENT ACTIONS
+export const createPayment = async(paymentData) => {
+    try {
+        const response = await api.post('/customer/createpayment', paymentData);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// USER MANAGEMENT ACTIONS
 export const deleteUser = (role, id) => async(dispatch) => {
     try {
         await api.delete(`/admin/deleteUsers/${role}/${id}`);
         dispatch(getDeleteSuccess());
-        dispatch(getUsers(role)); // Recharger la liste
+        dispatch(getUsers(role));
     } catch (error) {
         dispatch(getError(error.message));
     }
 };
 
-// Création d'un utilisateur
 export const createUser = (role, userData) => async(dispatch) => {
     try {
         const endpoints = {
@@ -563,5 +598,90 @@ export const createUser = (role, userData) => async(dispatch) => {
         dispatch(stuffAdded());
     } catch (error) {
         dispatch(authError(error.message));
+    }
+};
+
+// SEARCH ACTIONS
+export const searchProducts = async(key) => {
+    try {
+        const response = await api.get(`/searchProduct/${key}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const searchByCategory = async(category) => {
+    try {
+        const response = await api.get(`/searchProductbyCategory/${category}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+// Add these functions to your existing userHandle.js
+
+// Admin Detail View Actions
+export const getCustomerDetails = async(id) => {
+    try {
+        const response = await api.get(`/admin/getallcusdetails/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getSellerReviews = async(id) => {
+    try {
+        const response = await api.get(`/admin/getsellersrev`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getSellerProducts = async(id) => {
+    try {
+        const response = await api.get(`/getSellerProducts/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getOrderedProductsBySeller = async(id) => {
+    try {
+        const response = await api.get(`/getOrderedProductsBySeller/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getOrderedProductsByCustomer = async(id) => {
+    try {
+        const response = await api.get(`/getOrderedProductsByCustomer/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getCartDetail = async(id) => {
+    try {
+        const response = await api.get(`/getCartDetail/${id}`);
+        return response.data;
+    } catch (error) {
+        throw error;
+    }
+};
+
+export const getCustomerReturnRequests = async() => {
+    try {
+        const response = await api.get('/getreturnscust');
+        return response.data;
+    } catch (error) {
+        throw error;
     }
 };

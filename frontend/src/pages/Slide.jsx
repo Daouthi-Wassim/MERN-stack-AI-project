@@ -1,5 +1,5 @@
 import { Divider, Box, Typography, Button, styled, Container } from '@mui/material';
-
+import Rating from '../components/Rating';
 import { Link, useNavigate } from 'react-router-dom';
 import Carousel from 'react-multi-carousel';
 import "react-multi-carousel/lib/styles.css";
@@ -41,6 +41,7 @@ const Slide = ({ products, title }) => {
                             <Box textAlign="center" style={{ padding: '2px 10px' }}>
                                 <Image src={product.productImage} />
                                 <TitleText style={{ fontWeight: 600, color: '#212121' }}>{product.productName}</TitleText>
+                                <Rating value={product.avgRating || 0} />
                                 <TextContainer>
                                     <Text style={{ color: '#525050', textDecoration: "line-through" }}>{product.price.mrp}</Text>
                                     <Text>TND {product.price.cost}</Text>

@@ -1,6 +1,6 @@
 import { createSlice } from '@reduxjs/toolkit';
 import jwtDecode from 'jwt-decode';
-
+import { getUsers, getSpecificProducts, createNewOrder } from './userHandle';
 const initialState = {
     status: 'idle',
     loading: false,
@@ -10,7 +10,7 @@ const initialState = {
     isLoggedIn: false,
     error: null,
     response: null,
-
+    currentOrder: null,
     responseReview: null,
     responseProducts: null,
     responseSellerProducts: null,
@@ -27,6 +27,9 @@ const initialState = {
     filteredProducts: [],
     customersList: [],
 
+    orderLoading: false,
+    orderError: null,
+    orders: [],
 
     users: [],
     usersList: [],
@@ -37,7 +40,7 @@ const initialState = {
     notifications: [],
     paymentIntent: null,
     returns: [],
-    orders: [],
+
     sellerStats: null
 };
 
@@ -61,9 +64,22 @@ export const updateShippingDataInLocalStorage = (shippingData) => {
 
 const userSlice = createSlice({
     name: 'user',
+
     initialState,
     reducers: {
 
+        setUsers: (state, action) => {
+            state.usersList = action.payload;
+            state.loading = false;
+            state.error = null;
+        },
+        setLoading: (state) => {
+            state.loading = true;
+        },
+        setError: (state, action) => {
+            state.error = action.payload;
+            state.loading = false;
+        },
         GET_SELLERS_SUCCESS: (state, action) => {
             state.loading = false;
             state.sellers = action.payload;
@@ -346,16 +362,51 @@ const userSlice = createSlice({
                 state.loading = false;
                 state.error = null;
             })
-            .addMatcher(
-                (action) => action.type.endsWith('/rejected'),
-                (state, action) => {
-                    state.loading = false;
-                    state.error = action.error.message;
-                }
-            )
-            .addCase('USERS_LOADED', (state, action) => {
+
+        .addCase('USERS_LOADED', (state, action) => {
                 state.usersList = action.payload;
                 state.loading = false;
+            })
+            .addCase(getUsers.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(getUsers.fulfilled, (state, action) => {
+                state.loading = false;
+
+                state.usersList = Array.isArray(action.payload) ? action.payload :
+                    action.payload ? action.payload.users ? action.payload.users :
+                    action.payload ? action.payload.data ? action.payload.data : [] : [] : [];
+            })
+            .addCase(getUsers.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message;
+            })
+            .addCase(createNewOrder.pending, (state) => {
+                state.orderLoading = true;
+                state.orderError = null;
+            })
+            .addCase(createNewOrder.fulfilled, (state, action) => {
+                state.orderLoading = false;
+                state.currentOrder = action.payload;
+                state.orderError = null;
+            })
+            .addCase(createNewOrder.rejected, (state, action) => {
+                state.orderLoading = false;
+                state.orderError = action.payload;
+            })
+            .addCase(getSpecificProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(getSpecificProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.orders = action.payload.data || [];
+                state.error = null;
+            })
+            .addCase(getSpecificProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
             });
     }
 });
@@ -388,13 +439,16 @@ export const {
     customersListSuccess,
     getSpecificProductsFailed,
     specificProductSuccess,
-
+    setUsers,
+    setLoading,
+    setError,
     addToCart,
     removeFromCart,
     removeSpecificProduct,
     removeAllFromCart,
     fetchProductDetailsFromCart,
     updateCurrentUser,
+
 
     adminProductsSuccess,
     adminProductsFailed,

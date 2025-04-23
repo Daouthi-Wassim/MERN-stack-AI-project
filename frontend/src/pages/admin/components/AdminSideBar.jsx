@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import LogoutIcon from '@mui/icons-material/Logout';
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+//import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PeopleIcon from '@mui/icons-material/People';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
@@ -71,15 +71,7 @@ const AdminSideBar = () => {
             <Divider sx={{ my: 1 }} />
 
             <React.Fragment>
-                <ListItemButton
-                    component={Link} to="/admin/profile"
-                    sx={location.pathname.startsWith('/admin/profile') ? styles.currentStyle : styles.normalStyle}
-                >
-                    <ListItemIcon>
-                        <AccountCircleIcon sx={{ color: location.pathname.startsWith("/admin/profile") ? '#4d1c9c' : 'inherit' }} />
-                    </ListItemIcon>
-                    <ListItemText primary="Profile" />
-                </ListItemButton>
+              
 
                 <ListItemButton
                     component={Link} to="/logout"
