@@ -3,7 +3,9 @@
 ## 📋 Aperçu du Projet
 
 **SHOPPINGI** est une plateforme e-commerce intelligente développée dans le cadre d'un projet de fin d'études en Génie Logiciel & Intelligence Artificielle. Cette solution révolutionnaire intègre des technologies d'IA avancées pour optimiser l'expérience utilisateur et la gestion commerciale.
+## 🚀 Video Demo
 
+🔗 **[Live Demo](https://drive.google.com/file/d/1LWdUmnJlevLbTkHHUrqGEzh-0WDdc2_l/view?usp=sharing)** 
 ## 🎯 Objectifs
 
 - Créer une plateforme e-commerce avec des fonctionnalités d'IA avancées
